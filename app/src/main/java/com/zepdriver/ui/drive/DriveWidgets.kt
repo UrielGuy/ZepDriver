@@ -182,9 +182,6 @@ private fun RouteProgress(nav: NavState, stopName: String, walk: Double?, canEnd
                 )
             }
         }
-        if (nav.offRoute) {
-            Text("Off route, rerouting…", color = c.caution, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "To $stopName",

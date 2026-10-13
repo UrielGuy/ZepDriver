@@ -39,7 +39,7 @@ object Speech {
 
     /** All warning phrases for this year's rules, for every license type and time of day. */
     fun catalog(data: PlayaData, ruleSet: RuleSet): List<String> {
-        val out = linkedSetOf(SLOW_DOWN, SLOW_DOWN_ALARM, DAY_LICENSE, NIGHT_LICENSE, REROUTING)
+        val out = linkedSetOf(SLOW_DOWN, SLOW_DOWN_ALARM, DAY_LICENSE, NIGHT_LICENSE)
         for (z in ruleSet.zones(data)) when (z.kind) {
             ZoneKind.NO_ENTRY -> {
                 out += noEntryInside(z, outside = z.shapes.any { it is ZoneShape.Outside })

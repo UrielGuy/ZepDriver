@@ -18,7 +18,7 @@ data class NavState(
     val offRoute: Boolean,
     /** Arrived at the final stop. */
     val finished: Boolean,
-    /** Something to say now (turn prompt, "Arrived at X", "Rerouting"), or null. */
+    /** Something to say now (turn prompt, "Arrived at X"), or null. Reroutes are silent. */
     val speech: String?,
     /** Distance left to the current stop (this leg only); [remainingFt] covers all stops. */
     val toStopFt: Double = remainingFt,
@@ -107,7 +107,6 @@ class NavigationSession(
         if (offCount >= OFF_ROUTE_UPDATES) {
             offCount = 0
             if (replan(fix.position)) {
-                if (inCity(xy)) speech += REROUTING
                 current = snapshot(xy, speech)
                 return current
             }
