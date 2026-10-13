@@ -176,7 +176,9 @@ and routing:
     closest legal point and say "Park here, walk ~N ft".
 - **Potties button:** inserts the nearest porta-potty bank (by route
   distance) as the next stop. Available in all modes.
-- Voice turn-by-turn guidance.
+- Voice turn-by-turn guidance in the city only. On the open playa the route,
+  next-turn banner, distance and ETA are shown but not spoken (warnings
+  always speak).
 
 ---
 

@@ -1,6 +1,7 @@
 package com.zepdriver.core.nav
 
 import com.zepdriver.core.alerts.Speech
+import com.zepdriver.core.brc.BrcAddressing
 import com.zepdriver.core.geo.Fix
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.geo.Xy
@@ -59,6 +60,9 @@ class NavigationSession(
     private val spokenFar = HashSet<Int>()
     private val spokenNear = HashSet<Int>()
     private var current: NavState? = null
+    private val addressing = BrcAddressing(router.playa)
+
+    private fun inCity(p: Xy) = addressing.isInCity(p)
 
     init {
         replan(start)
@@ -103,7 +107,7 @@ class NavigationSession(
         if (offCount >= OFF_ROUTE_UPDATES) {
             offCount = 0
             if (replan(fix.position)) {
-                speech += REROUTING
+                if (inCity(xy)) speech += REROUTING
                 current = snapshot(xy, speech)
                 return current
             }
@@ -165,13 +169,15 @@ class NavigationSession(
             if (a > progress + 1.0 || i == lastIdx) {
                 next = ins
                 toNext = max(0.0, a - progress)
+                // On the open playa the route is shown, not spoken; prompts start in the city.
+                val voiced = inCity(xy) || inCity(router.playa.xy(ins.position))
                 if (!offRoute) {
                     if (toNext <= NEAR_FT && i != lastIdx && i !in spokenNear) {
                         spokenNear += i; spokenFar += i
-                        out += ins.speech
+                        if (voiced) out += ins.speech
                     } else if (toNext <= FAR_FT && i !in spokenFar && i !in spokenNear) {
                         spokenFar += i
-                        out += "In ${roundFeet(toNext)} feet, ${lowerFirst(ins.speech)}"
+                        if (voiced) out += "In ${roundFeet(toNext)} feet, ${lowerFirst(ins.speech)}"
                     }
                 }
                 break

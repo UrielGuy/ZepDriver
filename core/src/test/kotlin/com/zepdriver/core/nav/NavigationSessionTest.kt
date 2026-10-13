@@ -88,7 +88,8 @@ class NavigationSessionTest {
         assertTrue(a.offRoute)
         assertTrue(a.speech?.contains(NavigationSession.REROUTING) != true)
         val c = s.update(fix(off + Xy(10.0, 0.0)))!!
-        assertEquals(NavigationSession.REROUTING, c.speech?.substringBefore(". "))
+        // Rerouted silently: this is open playa (prompts are spoken only in the city).
+        assertTrue(c.speech?.contains(NavigationSession.REROUTING) != true)
         assertFalse(c.offRoute)
         assertTrue(c.plan != firstPlan)
         assertTrue(d.xy(c.plan.legs[0].path.first()).distanceTo(off + Xy(10.0, 0.0)) < 20)
@@ -131,5 +132,22 @@ class NavigationSessionTest {
         val aside = mid + Xy(30.0, 0.0)
         val st2 = s.update(fix(aside))!!
         assertTrue(d.xy(st2.legAhead.first()).distanceTo(aside) < 1.0)
+    }
+
+    @Test fun openPlayaIsSilentCityIsSpoken() {
+        // Deep playa to an art-free spot on the open playa: shown, never spoken (except arrival).
+        val playa = NavigationSession(router, NavFixtures.ll("12:00", 3500.0), listOf(
+            Destination("Pin", NavFixtures.ll("2:30", 1200.0), DestinationKind.PIN),
+        ))
+        val quiet = mutableListOf<String>()
+        driveLeg(playa, speech = quiet)
+        assertTrue(quiet.none { it.startsWith("In ") || it == NavigationSession.REROUTING }, "playa speech: $quiet")
+        assertTrue(quiet.all { it.startsWith("Arrived") }, "playa speech: $quiet")
+
+        // Into the city: turn prompts are spoken.
+        val city = NavigationSession(router, NavFixtures.ll("4:30", 2300.0), listOf(NavFixtures.campNear("5:00", "G")))
+        val spoken = mutableListOf<String>()
+        driveLeg(city, speech = spoken)
+        assertTrue(spoken.any { it.startsWith("In ") && it.contains(" feet, ") }, "city speech: $spoken")
     }
 }
