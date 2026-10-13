@@ -1,6 +1,7 @@
 package com.zepdriver.ui.common
 
 import java.util.Locale
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
@@ -39,6 +40,21 @@ object Fmt {
             else -> "${s / 86_400} d"
         }
     }
+
+    /** Trip time: "<1 min", "12 min", "1 h 05 min". */
+    fun duration(minutes: Double): String {
+        val m = ceil(minutes.coerceAtLeast(0.0)).toLong()
+        return when {
+            minutes < 1.0 -> "<1 min"
+            m < 60 -> "$m min"
+            else -> String.format(Locale.US, "%d h %02d min", m / 60, m % 60)
+        }
+    }
+
+    /** Local clock time [minutes] from [nowMillis], e.g. "9:42 PM". */
+    fun clockIn(nowMillis: Long, minutes: Double): String =
+        java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT, Locale.US)
+            .format(java.util.Date(nowMillis + (minutes * 60_000).roundToLong()))
 
     /** "3 min ago" / "just now". */
     fun ago(nowMillis: Long, thenMillis: Long): String {

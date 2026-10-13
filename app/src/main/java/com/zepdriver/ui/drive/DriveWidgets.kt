@@ -189,12 +189,19 @@ private fun RouteProgress(nav: NavState, stopName: String, walk: Double?, canEnd
                 modifier = Modifier.weight(1f),
             )
             Text(
-                "${Fmt.distance(nav.remainingFt)} left",
+                Fmt.distance(nav.toStopFt),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = c.onPanelMuted,
             )
         }
+        // ETA to the current stop, assuming the 5 mph limit the whole way.
+        val minutes = nav.minutesToStop()
+        Text(
+            "ETA ${Fmt.duration(minutes)} · ${Fmt.clockIn(System.currentTimeMillis(), minutes)} at 5 mph",
+            style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
+            maxLines = 1,
+        )
         if (walk != null && walk > 0) {
             Text(
                 "Park here and walk ${Fmt.feet(walk)}",

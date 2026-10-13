@@ -18,7 +18,18 @@ data class NavState(
     val finished: Boolean,
     /** Something to say now (turn prompt, "Arrived at X", "Rerouting"), or null. */
     val speech: String?,
-)
+    /** Distance left to the current stop (this leg only); [remainingFt] covers all stops. */
+    val toStopFt: Double = remainingFt,
+) {
+    /** Minutes to the current stop when driving the speed limit the whole way. */
+    fun minutesToStop(mph: Double = ETA_SPEED_MPH): Double = toStopFt / (mph * FEET_PER_MILE / 60.0)
+
+    companion object {
+        /** ETAs assume the 5 mph speed limit. */
+        const val ETA_SPEED_MPH = 5.0
+        private const val FEET_PER_MILE = 5280.0
+    }
+}
 
 /**
  * Tracks progress along a multi-stop plan, advances legs on arrival, and
@@ -160,9 +171,10 @@ class NavigationSession(
                 break
             }
         }
-        var rem = max(0.0, g.length - progress)
+        val toStop = max(0.0, g.length - progress)
+        var rem = toStop
         for (k in legIndex + 1 until p.legs.size) rem += p.legs[k].distanceFt
-        return NavState(p, legIndex, next, toNext, rem, offRoute, false, out.joinToString(". ").ifEmpty { null })
+        return NavState(p, legIndex, next, toNext, rem, offRoute, false, out.joinToString(". ").ifEmpty { null }, toStop)
     }
 
     private fun arrivalSpeech(leg: RouteLeg): String = leg.walkFt?.let {
