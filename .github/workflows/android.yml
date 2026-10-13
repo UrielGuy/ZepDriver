@@ -25,6 +25,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Core unit tests
         run: ./gradlew :core:test --stacktrace
+      - name: Pre-record warning phrases
+        # Piper with the public-domain LJSpeech voice (trained from scratch on
+        # LJSpeech); clips are bundled so warnings speak even without an
+        # offline text-to-speech voice on the phone.
+        run: |
+          ./gradlew :core:speechCatalog
+          mkdir -p build/tts
+          curl -sSfL --retry 3 -o build/tts/piper.tgz https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz
+          tar -xzf build/tts/piper.tgz -C build/tts
+          VOICE=https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ljspeech/high
+          curl -sSfL --retry 3 -o build/tts/voice.onnx "$VOICE/en_US-ljspeech-high.onnx"
+          curl -sSfL --retry 3 -o build/tts/voice.onnx.json "$VOICE/en_US-ljspeech-high.onnx.json"
+          python3 tools/speech/generate_clips.py --phrases core/build/speech/phrases.json \
+            --piper build/tts/piper/piper --model build/tts/voice.onnx --out app/src/main/assets/speech
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
       - name: Upload APK

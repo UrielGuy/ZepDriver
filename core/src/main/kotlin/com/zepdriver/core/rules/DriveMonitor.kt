@@ -1,5 +1,6 @@
 package com.zepdriver.core.rules
 
+import com.zepdriver.core.alerts.Speech
 import com.zepdriver.core.alerts.Alert
 import com.zepdriver.core.alerts.AlertKind
 import com.zepdriver.core.alerts.AlertLevel
@@ -86,11 +87,11 @@ class DriveMonitor(
         return when {
             profile.licenseHours == LicenseHours.DAY && isNight -> Alert(
                 HOURS_KEY, AlertKind.LICENSE_HOURS, AlertLevel.WARNING, "Day license: no driving at night",
-                detail = "Your license is valid sunrise to sunset.", speech = "Day license. No driving at night.",
+                detail = "Your license is valid sunrise to sunset.", speech = Speech.DAY_LICENSE,
             )
             profile.licenseHours == LicenseHours.NIGHT && !isNight -> Alert(
                 HOURS_KEY, AlertKind.LICENSE_HOURS, AlertLevel.WARNING, "Night license: no driving in daylight",
-                detail = "Your license is valid sunset to sunrise.", speech = "Night license. No driving in daylight.",
+                detail = "Your license is valid sunset to sunrise.", speech = Speech.NIGHT_LICENSE,
             )
             else -> null
         }

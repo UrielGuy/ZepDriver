@@ -26,3 +26,13 @@ tasks.test {
     // Tests read the bundled playa data straight from the app's assets.
     systemProperty("zep.assets", rootProject.file("app/src/main/assets").absolutePath)
 }
+
+// Dumps every fixed warning phrase for the clip generator (see tools/speech).
+tasks.register<JavaExec>("speechCatalog") {
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.zepdriver.core.alerts.SpeechCatalogMainKt")
+    args(
+        rootProject.file("app/src/main/assets/playa/2026").absolutePath,
+        layout.buildDirectory.file("speech/phrases.json").get().asFile.absolutePath,
+    )
+}

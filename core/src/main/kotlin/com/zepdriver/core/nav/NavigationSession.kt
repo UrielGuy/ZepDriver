@@ -1,5 +1,6 @@
 package com.zepdriver.core.nav
 
+import com.zepdriver.core.alerts.Speech
 import com.zepdriver.core.geo.Fix
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.geo.Xy
@@ -212,7 +213,7 @@ class NavigationSession(
         const val OFF_ROUTE_UPDATES = 3
         const val FAR_FT = 300.0
         const val NEAR_FT = 80.0
-        const val REROUTING = "Rerouting"
+        const val REROUTING = Speech.REROUTING
         private const val BACKTRACK_FT = 150.0
         private const val BACKTRACK_PENALTY = 500.0
 

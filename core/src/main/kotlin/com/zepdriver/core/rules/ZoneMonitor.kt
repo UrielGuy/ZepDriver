@@ -1,5 +1,6 @@
 package com.zepdriver.core.rules
 
+import com.zepdriver.core.alerts.Speech
 import com.zepdriver.core.alerts.Alert
 import com.zepdriver.core.alerts.AlertKind
 import com.zepdriver.core.alerts.AlertLevel
@@ -146,7 +147,7 @@ class ZoneMonitor(
                 key(z, AlertKind.NO_ENTRY_INSIDE), AlertKind.NO_ENTRY_INSIDE, AlertLevel.ALARM,
                 title = if (outside) "Outside ${z.spokenName}" else "Inside ${z.name}",
                 detail = z.note,
-                speech = if (outside) "You're outside ${z.spokenName}. Turn back." else "Get out of ${z.spokenName}",
+                speech = Speech.noEntryInside(z, outside),
             )
         }
         if (c.ahead.isNotEmpty() && shapes.any { s -> c.ahead.any { s.contains(it) } }) {
@@ -154,7 +155,7 @@ class ZoneMonitor(
                 key(z, AlertKind.NO_ENTRY_APPROACH), AlertKind.NO_ENTRY_APPROACH, AlertLevel.WARNING,
                 title = "${z.name} ahead",
                 detail = z.note,
-                speech = "${z.spokenName.capitalized()} ahead. Turn away.",
+                speech = Speech.noEntryAhead(z),
             )
         }
         return null
@@ -205,14 +206,14 @@ class ZoneMonitor(
                 key(z, AlertKind.DRIVING_ALONG), AlertKind.DRIVING_ALONG, AlertLevel.ALARM,
                 title = "Driving on ${z.name}",
                 detail = z.note,
-                speech = "You're driving on ${z.spokenName}. Get off it.",
+                speech = Speech.drivingAlong(z),
             )
         }
         return if (angle < ALONG_MAX_DEG) shallowAlert(z) else Alert(
             key(z, AlertKind.CROSSING), AlertKind.CROSSING, AlertLevel.ADVISORY,
             title = "Crossing ${z.name}",
             detail = z.note,
-            speech = "Crossing ${z.spokenName}. Don't drive along it.",
+            speech = Speech.crossing(z),
         )
     }
 
@@ -235,7 +236,7 @@ class ZoneMonitor(
         key(z, AlertKind.CROSSING), AlertKind.CROSSING, AlertLevel.ADVISORY,
         title = "${z.name} — cross only",
         detail = z.note,
-        speech = "${z.spokenName.capitalized()} is cross only. Don't drive along it.",
+        speech = Speech.crossOnlyAhead(z),
     )
 
     // --- License area -------------------------------------------------------------
@@ -255,7 +256,7 @@ class ZoneMonitor(
                 key(z, AlertKind.LICENSE_AREA) + ":route", AlertKind.LICENSE_AREA, AlertLevel.ADVISORY,
                 title = "Direct route to camp only",
                 detail = z.note,
-                speech = "Direct route to camp only.",
+                speech = Speech.DIRECT_ROUTE_ONLY,
             )
         }
         if (c.moving) {
@@ -273,8 +274,7 @@ class ZoneMonitor(
             if (alarm) AlertLevel.ALARM else AlertLevel.WARNING,
             title = "Playa-only license: no city driving",
             detail = z.note,
-            speech = if (alarm) "Playa-only license. Leave the city by the shortest route."
-            else "Playa-only license. No city driving.",
+            speech = if (alarm) Speech.PLAYA_ONLY_ALARM else Speech.PLAYA_ONLY,
         )
     }
 
@@ -285,7 +285,7 @@ class ZoneMonitor(
         if (p.shapes.none { it.mayTouch(c.query) && it.contains(c.phone) }) return null
         return Alert(
             key(z, AlertKind.SOUND), AlertKind.SOUND, AlertLevel.ADVISORY,
-            title = z.name, detail = z.note, speech = z.note ?: "Sound off in ${z.spokenName}.",
+            title = z.name, detail = z.note, speech = Speech.soundOff(z),
         )
     }
 
@@ -341,6 +341,5 @@ class ZoneMonitor(
             return if (d > 90) 180 - d else d
         }
 
-        private fun String.capitalized() = replaceFirstChar { it.uppercaseChar() }
     }
 }

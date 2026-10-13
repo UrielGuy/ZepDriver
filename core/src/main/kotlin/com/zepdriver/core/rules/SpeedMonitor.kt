@@ -1,5 +1,6 @@
 package com.zepdriver.core.rules
 
+import com.zepdriver.core.alerts.Speech
 import com.zepdriver.core.alerts.Alert
 import com.zepdriver.core.alerts.AlertKind
 import com.zepdriver.core.alerts.AlertLevel
@@ -112,10 +113,10 @@ class SpeedMonitor(
         return when (level) {
             AlertLevel.NONE, AlertLevel.ADVISORY -> null
             AlertLevel.CAUTION -> Alert(KEY, AlertKind.SPEED, AlertLevel.CAUTION, "Near the speed limit", detail)
-            AlertLevel.WARNING -> Alert(KEY, AlertKind.SPEED, AlertLevel.WARNING, "Slow down", detail, "Slow down")
+            AlertLevel.WARNING -> Alert(KEY, AlertKind.SPEED, AlertLevel.WARNING, "Slow down", detail, Speech.SLOW_DOWN)
             AlertLevel.ALARM -> Alert(
                 KEY, AlertKind.SPEED, AlertLevel.ALARM, "Too fast — slow down", detail,
-                "Slow down! Five miles an hour.",
+                Speech.SLOW_DOWN_ALARM,
             )
         }
     }
