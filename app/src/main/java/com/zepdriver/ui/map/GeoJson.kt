@@ -14,6 +14,8 @@ import com.zepdriver.core.profile.VehicleProfile
 import com.zepdriver.core.rules.Zone
 import com.zepdriver.core.rules.ZoneShape
 import com.zepdriver.core.trip.TripPoint
+import com.zepdriver.core.vehicles.VehicleModel
+import com.zepdriver.core.vehicles.VehicleModels
 import com.zepdriver.ui.common.Fmt
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -26,6 +28,18 @@ object GeoJson {
 
     /** Positions older than this are drawn faded. */
     const val FLEET_STALE_MILLIS = 10 * 60_000L
+
+    // `kind` of tappable features (see MapStyle.TAP_LAYERS); ids go in `id`.
+    const val KIND_ME = "me"
+    const val KIND_FLEET = "fleet"
+    const val KIND_STOP = "stop"
+    const val KIND_HOME = "home"
+    const val KIND_FAVORITE = "favorite"
+    const val KIND_LANDMARK = "landmark"
+    const val KIND_ART = "art"
+    const val KIND_TOILET = "toilet"
+    const val KIND_CAMP = "camp"
+    const val KIND_POI = "poi"
 
     /** Streams features into a FeatureCollection string. */
     class Builder {
@@ -154,6 +168,8 @@ object GeoJson {
             b.polygon(
                 listOf(p.outer.map { data.ll(it) }) + p.holes.map { h -> h.map { data.ll(it) } },
                 mapOf(
+                    "kind" to KIND_LANDMARK,
+                    "id" to p.landmark,
                     "part" to p.part.name,
                     "base" to p.baseFt / FEET_PER_METER,
                     "top" to p.topFt / FEET_PER_METER,
@@ -171,10 +187,10 @@ object GeoJson {
         val b = Builder()
         val homeFavorite = favorites.firstOrNull { it.label == HOME_LABEL }
         val homeAt = home ?: homeFavorite?.destination?.position
-        if (homeAt != null) b.point(homeAt, mapOf("kind" to "home", "name" to HOME_LABEL))
+        if (homeAt != null) b.point(homeAt, mapOf("kind" to KIND_HOME, "name" to HOME_LABEL))
         for (f in favorites) {
             if (f === homeFavorite) continue
-            b.point(f.destination.position, mapOf("kind" to "favorite", "name" to f.label))
+            b.point(f.destination.position, mapOf("kind" to KIND_FAVORITE, "id" to f.id, "name" to f.label))
         }
         return b.build()
     }
@@ -190,27 +206,29 @@ object GeoJson {
             val ring = listOf(
                 Xy(c.x - h, c.y - h), Xy(c.x + h, c.y - h), Xy(c.x + h, c.y + h), Xy(c.x - h, c.y + h),
             ).map { data.ll(it) }
-            b.polygon(listOf(ring), mapOf("name" to art.name))
+            b.polygon(listOf(ring), mapOf("kind" to KIND_ART, "id" to art.id, "name" to art.name))
         }
         return b.build()
     }
 
     fun artPoints(data: PlayaData): String {
         val b = Builder()
-        for (art in data.art) b.point(art.position, mapOf("name" to art.name))
+        for (art in data.art) b.point(art.position, mapOf("kind" to KIND_ART, "id" to art.id, "name" to art.name))
         return b.build()
     }
 
     fun camps(data: PlayaData): String {
         val b = Builder()
-        for (camp in data.camps) b.point(camp.position, mapOf("name" to camp.name))
+        for (camp in data.camps) b.point(camp.position, mapOf("kind" to KIND_CAMP, "id" to camp.id, "name" to camp.name))
         return b.build()
     }
 
     /** Toilet bank centers, for the "Potties" labels. */
     fun toiletPoints(data: PlayaData): String {
         val b = Builder()
-        for (t in data.toilets) b.point(data.ll(t.center), mapOf("name" to "Potties"))
+        data.toilets.forEachIndexed { i, t ->
+            b.point(data.ll(t.center), mapOf("kind" to KIND_TOILET, "id" to "toilet:$i", "name" to "Potties"))
+        }
         return b.build()
     }
 
@@ -235,7 +253,7 @@ object GeoJson {
     fun stops(stops: List<Destination>, draft: Boolean): String {
         val b = Builder()
         stops.forEachIndexed { i, s ->
-            b.point(s.position, mapOf("n" to (i + 1), "name" to s.name, "draft" to draft))
+            b.point(s.position, mapOf("kind" to KIND_STOP, "id" to i.toString(), "n" to (i + 1), "name" to s.name, "draft" to draft))
         }
         return b.build()
     }
@@ -251,6 +269,9 @@ object GeoJson {
             b.point(
                 pos,
                 mapOf(
+                    "kind" to KIND_FLEET,
+                    // A string: large node numbers don't survive the map's float conversion.
+                    "id" to v.nodeNum.toString(),
                     "label" to "$name · $age",
                     "stale" to (nowMillis - t > FLEET_STALE_MILLIS),
                     "heading" to v.headingDeg,
@@ -261,7 +282,7 @@ object GeoJson {
     }
 
     /** Our own trail as one line (never shared over the mesh). */
-    fun trail(points: List<TripPoint>, minSpacingFt: Double = 15.0, maxPoints: Int = 4000): String {
+    fun trail(points: List<TripPoint>, minSpacingFt: Double = 15.0, maxPoints: Int = 4000, maxJumpFt: Double = 1_500.0): String {
         if (points.size < 2) return EMPTY
         // Thin by distance using a cheap local scale, then cap the count.
         val ftPerDegLat = 364_567.2
@@ -280,42 +301,53 @@ object GeoJson {
             val step = kept.size.toDouble() / maxPoints
             (0 until maxPoints).map { kept[(it * step).toInt()] } + kept.last()
         }
-        // Break the line where there's a long gap (e.g. overnight) so it doesn't jump.
+        // Break the line where there's a long gap (e.g. overnight) or a jump (the
+        // simulator's car moved by hand) so it doesn't cut across the playa.
         val b = Builder()
         var seg = ArrayList<LatLon>()
-        var prevT = Long.MIN_VALUE
+        var prev: TripPoint? = null
         for (p in thinned) {
-            if (prevT != Long.MIN_VALUE && p.timeMillis - prevT > 10 * 60_000L) {
+            val q = prev
+            if (q != null && (p.timeMillis - q.timeMillis > 10 * 60_000L ||
+                    kotlin.math.hypot((p.lat - q.lat) * ftPerDegLat, (p.lon - q.lon) * ftPerDegLon) > maxJumpFt)
+            ) {
                 b.line(seg)
                 seg = ArrayList()
             }
             seg += LatLon(p.lat, p.lon)
-            prevT = p.timeMillis
+            prev = p
         }
         b.line(seg)
         return b.build()
     }
 
     /**
-     * Our own vehicle: a dot (`g = "pt"`) plus, when the heading is known, a
-     * triangle pointing along it (`g = "arrow"`), sized in feet.
+     * Our own vehicle: a 3D [model] (prisms with `g = "model"`, a `part` and
+     * `base`/`top` heights in meters) facing [headingDeg], plus a dot
+     * (`g = "pt"`) that the map shows when zoomed out.
      */
-    fun me(data: PlayaData, fix: Fix?, lengthFt: Double = 60.0): String {
+    fun me(
+        data: PlayaData,
+        fix: Fix?,
+        model: VehicleModel,
+        profile: VehicleProfile,
+        headingDeg: Double,
+    ): String {
         if (fix == null) return EMPTY
         val b = Builder()
-        val bearing = fix.bearingDeg
-        if (bearing != null) {
-            val c = data.xy(fix.position)
-            val fwd = Xy.fromBearing(bearing)
-            val right = Xy(fwd.y, -fwd.x)
-            val tip = c + fwd * (lengthFt * 0.6)
-            val back = c - fwd * (lengthFt * 0.4)
-            val notch = c - fwd * (lengthFt * 0.15)
-            val half = lengthFt * 0.38
-            val ring = listOf(tip, back + right * half, notch, back - right * half).map { data.ll(it) }
-            b.polygon(listOf(ring), mapOf("g" to "arrow"))
+        for (p in VehicleModels.build(model, data.xy(fix.position), headingDeg, profile)) {
+            b.polygon(
+                listOf(p.outer.map { data.ll(it) }),
+                mapOf(
+                    "g" to "model",
+                    "kind" to KIND_ME,
+                    "part" to p.part.name,
+                    "base" to p.baseFt / FEET_PER_METER,
+                    "top" to p.topFt / FEET_PER_METER,
+                ),
+            )
         }
-        b.point(fix.position, mapOf("g" to "pt"))
+        b.point(fix.position, mapOf("g" to "pt", "kind" to KIND_ME))
         return b.build()
     }
 

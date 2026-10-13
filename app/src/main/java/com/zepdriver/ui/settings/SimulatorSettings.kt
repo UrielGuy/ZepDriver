@@ -1,11 +1,14 @@
 package com.zepdriver.ui.settings
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zepdriver.core.sim.SimClock
 import com.zepdriver.core.sim.SimMode
 import com.zepdriver.core.sim.SimStart
 import com.zepdriver.ui.MainViewModel
@@ -58,6 +62,7 @@ private fun SimulatorSettings(vm: MainViewModel) {
         )
         Text(
             "Warnings, navigation, Potties and the trip log react as if you were driving on playa. " +
+                "Long-press the map to move the car there. " +
                 "Simulated positions are never sent to other cars. Turns itself off when the app restarts.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -79,6 +84,23 @@ private fun SimulatorSettings(vm: MainViewModel) {
             )
         }
 
+        SectionTitle("Time")
+        Text(
+            "Run time faster so you don't have to watch it at real playa speed. The car still drives at its " +
+                "real speed (the speedometer shows it); timers, arrival and the ETA follow simulated time.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (w in SimClock.WARPS) {
+                FilterChip(
+                    selected = state.warp == w,
+                    onClick = { sim.setWarp(w) },
+                    label = { Text("×$w") },
+                )
+            }
+        }
+
         SectionTitle("Start at")
         if (state.mode == SimMode.TOUR) {
             Text(
@@ -87,6 +109,11 @@ private fun SimulatorSettings(vm: MainViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Text(
+            "Or long-press anywhere on the map to move the car there.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         for (start in SimStart.entries) {
             RadioRow(
                 title = start.label,

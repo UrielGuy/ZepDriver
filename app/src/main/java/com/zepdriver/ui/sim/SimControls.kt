@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zepdriver.SimState
 import com.zepdriver.SimulatorController
+import com.zepdriver.core.sim.SimClock
 import com.zepdriver.core.sim.SimMode
 import java.util.Locale
 
@@ -51,8 +52,9 @@ private val SimMagenta = Color(0xFFD500F9)
 
 /**
  * Playa simulator overlay for the driving view: an unmistakable "SIMULATED
- * GPS" chip plus a compact control pad. Shows nothing unless the simulator is
- * on. It stays usable while moving (it's a test tool).
+ * GPS" chip (with the time warp) plus a compact control pad. Shows nothing
+ * unless the simulator is on. It stays usable while moving (it's a test tool).
+ * Long-pressing the map moves the car (see MainViewModel.teleportSim).
  */
 @Composable
 fun SimOverlay(sim: SimulatorController, modifier: Modifier = Modifier) {
@@ -73,7 +75,7 @@ private fun SimPad(sim: SimulatorController, state: SimState, modifier: Modifier
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            SimulatedChip()
+            SimulatedChip(state.warp)
             Text(
                 statusLine(state),
                 fontSize = 13.sp,
@@ -104,7 +106,21 @@ private fun SimPad(sim: SimulatorController, state: SimState, modifier: Modifier
                     PadButton("Next", "Next tour segment", wide = true) { sim.nextSegment() }
                 }
             }
-            PadButton("Sim off", "Turn the simulator off", wide = true) { sim.setEnabled(false) }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Cycles ×1 → ×2 → ×5 → ×10 → ×20 → ×1.
+                PadButton("×${state.warp}", "Time warp ×${state.warp}, tap for faster", wide = true) {
+                    val warps = SimClock.WARPS
+                    sim.setWarp(warps[(warps.indexOf(state.warp) + 1) % warps.size])
+                }
+                PadButton("Sim off", "Turn the simulator off", wide = true) { sim.setEnabled(false) }
+            }
+            Text(
+                "Long-press the map to move the car",
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+                textAlign = TextAlign.Center,
+                color = Color.White.copy(alpha = 0.8f),
+            )
         }
     }
 }
@@ -119,14 +135,20 @@ private fun statusLine(state: SimState): String = when (state.mode) {
 }
 
 @Composable
-private fun SimulatedChip() {
+private fun SimulatedChip(warp: Int) {
     Box(
         Modifier
             .clip(RoundedCornerShape(8.dp))
             .background(SimMagenta)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
-        Text("SIMULATED GPS", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, maxLines = 1)
+        Text(
+            if (warp > 1) "SIMULATED GPS ×$warp" else "SIMULATED GPS",
+            color = Color.White,
+            fontSize = if (warp > 1) 12.sp else 14.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
     }
 }
 

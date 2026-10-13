@@ -40,6 +40,21 @@ object Landmarks {
     const val TEMPLE = "The Temple"
     const val CENTER_CAMP = "Center Camp"
 
+    /** One line about each landmark, for the map's info popup. */
+    val ABOUT: Map<String, String> = mapOf(
+        MAN to "The Man, standing on “Cryptomeria”, a 60 ft cedar-tree tower with a double-helix stair.",
+        TEMPLE to "“Temple of the Moon”: slatted petals around a central spire.",
+        CENTER_CAMP to "The Canopy: an acre of shade at the heart of the city.",
+    )
+
+    /** Where each landmark stands. */
+    fun center(data: PlayaData, name: String): Xy? = when (name) {
+        MAN -> data.manXy
+        TEMPLE -> data.templeXy
+        CENTER_CAMP -> data.layout.centerCamp.let { Clock.point(data.layout, Clock.parse(it.clock)!!.toDouble(), it.distanceFt) }
+        else -> null
+    }
+
     fun build(data: PlayaData): List<Prism> {
         val layout = data.layout
         val cc = layout.centerCamp

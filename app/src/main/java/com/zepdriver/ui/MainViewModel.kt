@@ -251,6 +251,17 @@ class MainViewModel : ViewModel() {
         _toasts.tryEmit(text)
     }
 
+    /**
+     * Long-press on the map: while the simulator is on, moves the simulated car
+     * there. Returns false (press not used) otherwise.
+     */
+    fun teleportSim(position: LatLon): Boolean {
+        if (!sim.available || !sim.state.value.enabled) return false
+        sim.teleport(position)
+        toast("Moved the simulated car to ${describe(position) ?: "the pressed spot"}")
+        return true
+    }
+
     // --- Driving ----------------------------------------------------------------------------
     fun startDriving() {
         runCatching { AppGraph.drive.start() }

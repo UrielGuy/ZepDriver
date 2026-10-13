@@ -101,7 +101,7 @@ fun AlertBanner(alert: Alert, flashOn: Boolean, modifier: Modifier = Modifier) {
         contentColor = fg,
         shape = RoundedCornerShape(18.dp),
         shadowElevation = 6.dp,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
     ) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
             Text(
@@ -123,7 +123,7 @@ fun AlertBanner(alert: Alert, flashOn: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
-/** Turn-by-turn panel while navigating. */
+/** Turn-by-turn panel while navigating. [nowMillis] is the time the ETA counts from. */
 @Composable
 fun NavPanel(
     nav: NavState,
@@ -131,6 +131,7 @@ fun NavPanel(
     canEnd: Boolean,
     onEnd: () -> Unit,
     modifier: Modifier = Modifier,
+    nowMillis: Long = System.currentTimeMillis(),
 ) {
     val c = Zep.colors
     val leg = nav.plan.legs.getOrNull(nav.legIndex)
@@ -140,7 +141,7 @@ fun NavPanel(
         contentColor = c.onPanel,
         shape = RoundedCornerShape(18.dp),
         shadowElevation = 6.dp,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
     ) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (nav.finished) {
@@ -152,14 +153,14 @@ fun NavPanel(
                 )
                 Button(onClick = onEnd, modifier = Modifier.heightIn(min = 52.dp)) { Text("Done", fontSize = 18.sp) }
             } else {
-                RouteProgress(nav, stopName, leg?.walkFt, canEnd, onEnd)
+                RouteProgress(nav, stopName, leg?.walkFt, canEnd, onEnd, nowMillis)
             }
         }
     }
 }
 
 @Composable
-private fun RouteProgress(nav: NavState, stopName: String, walk: Double?, canEnd: Boolean, onEnd: () -> Unit) {
+private fun RouteProgress(nav: NavState, stopName: String, walk: Double?, canEnd: Boolean, onEnd: () -> Unit, nowMillis: Long) {
     val c = Zep.colors
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         val next = nav.nextInstruction
@@ -202,7 +203,7 @@ private fun RouteProgress(nav: NavState, stopName: String, walk: Double?, canEnd
         // ETA to the current stop, assuming the 5 mph limit the whole way.
         val minutes = nav.minutesToStop()
         Text(
-            "ETA ${Fmt.duration(minutes)} · ${Fmt.clockIn(System.currentTimeMillis(), minutes)} at 5 mph",
+            "ETA ${Fmt.duration(minutes)} · ${Fmt.clockIn(nowMillis, minutes)} at 5 mph",
             style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
             maxLines = 1,
         )
@@ -237,10 +238,12 @@ private fun RouteProgress(nav: NavState, stopName: String, walk: Double?, canEnd
     }
 }
 
-/** Current BRC address plus small GPS / radio indicators. */
+/**
+ * Small GPS / radio / routing indicators for a corner of the driving view.
+ * (The BRC address shows when you tap your car on the map.)
+ */
 @Composable
-fun AddressBar(
-    address: String?,
+fun StatusChip(
     fix: Fix?,
     mesh: MeshUiState,
     fleetCount: Int,
@@ -249,24 +252,19 @@ fun AddressBar(
 ) {
     val c = Zep.colors
     Surface(
-        color = c.panel,
+        color = c.panel.copy(alpha = 0.92f),
         contentColor = c.onPanel,
-        shape = RoundedCornerShape(18.dp),
-        shadowElevation = 4.dp,
-        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        shadowElevation = 3.dp,
+        modifier = modifier,
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-            Text(
-                address ?: if (fix == null) "Waiting for GPS…" else "Locating…",
-                style = TextStyle(fontSize = 26.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                GpsIndicator(fix)
-                MeshIndicator(mesh, fleetCount)
-                if (routerBusy) StatusDot(c.caution, "Planning route…")
-            }
+        Column(
+            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            GpsIndicator(fix)
+            MeshIndicator(mesh, fleetCount)
+            if (routerBusy) StatusDot(c.caution, "Preparing routes…")
         }
     }
 }
@@ -300,7 +298,7 @@ private fun StatusDot(color: Color, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(5.dp))
-        Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Zep.colors.onPanelMuted, maxLines = 1)
+        Text(text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Zep.colors.onPanelMuted, maxLines = 1)
     }
 }
 
