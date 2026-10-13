@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zepdriver.AppGraph
+import com.zepdriver.VoiceState
 import com.zepdriver.AppPrefs
 import com.zepdriver.DriveUiState
 import com.zepdriver.Favorite
@@ -73,6 +74,7 @@ class MainViewModel : ViewModel() {
     val fleet: StateFlow<List<FleetVehicle>> = AppGraph.mesh.fleet
     val messages: StateFlow<List<MeshText>> = AppGraph.mesh.messages
     val profile: StateFlow<VehicleProfile> = AppGraph.settings.profile
+    val voice: StateFlow<VoiceState> = AppGraph.voice.state
     val prefs: StateFlow<AppPrefs> = AppGraph.settings.prefs
     val favorites: StateFlow<List<Favorite>> = AppGraph.settings.favorites
     /** Playa simulator (debug builds only; see [SimulatorController.available]). */
@@ -265,6 +267,19 @@ class MainViewModel : ViewModel() {
     // --- Driving ----------------------------------------------------------------------------
     fun startDriving() {
         runCatching { AppGraph.drive.start() }
+    }
+
+    fun testVoice() = AppGraph.voice.test()
+    fun refreshVoice() = AppGraph.voice.refresh()
+
+    /** Opens Android's offline voice download; the first-run prompt counts as answered. */
+    fun installVoice() {
+        markVoicePromptSeen()
+        AppGraph.voice.openInstall()
+    }
+
+    fun markVoicePromptSeen() {
+        if (!prefs.value.voicePromptSeen) updatePrefs(prefs.value.copy(voicePromptSeen = true))
     }
 
     fun goToPotties() {

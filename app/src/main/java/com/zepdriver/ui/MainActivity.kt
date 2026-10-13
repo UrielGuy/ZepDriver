@@ -3,6 +3,7 @@ package com.zepdriver.ui
 import android.content.Intent
 import android.hardware.usb.UsbManager
 import android.os.Bundle
+import com.zepdriver.AppGraph
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +21,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
         setContent { ZepRoot(vm) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Back from Android's voice download: look again.
+        if (AppGraph.voice.state.value.offlineVoice == false) AppGraph.voice.refresh()
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -114,6 +115,25 @@ private fun MainScaffold(vm: MainViewModel, bundle: PlayaBundle, ui: DriveUiStat
     }
     LaunchedEffect(vm) {
         vm.toasts.collect { snackbar.showSnackbar(it) }
+    }
+
+    // First run: offer to install an offline voice for directions (warnings are recorded).
+    val prefs by vm.prefs.collectAsStateWithLifecycle()
+    val voice by vm.voice.collectAsStateWithLifecycle()
+    if (!locked && !prefs.voicePromptSeen && voice.offlineVoice == false) {
+        AlertDialog(
+            onDismissRequest = vm::markVoicePromptSeen,
+            title = { Text("Install an offline voice") },
+            text = {
+                Text(
+                    "Warnings are pre-recorded and always speak. Turn-by-turn directions use your " +
+                        "phone's text-to-speech, and there's no internet on the playa, so download an " +
+                        "offline English voice now. On the next screen pick English (US) and download it.",
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::installVoice) { Text("Install voice") } },
+            dismissButton = { TextButton(onClick = vm::markVoicePromptSeen) { Text("Not now") } },
+        )
     }
 
     // Moving: only the driving view, and that's where we are when the car stops.

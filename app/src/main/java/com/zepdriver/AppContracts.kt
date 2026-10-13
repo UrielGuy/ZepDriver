@@ -54,6 +54,8 @@ enum class ThemeMode { AUTO, DAY, NIGHT }
 @Serializable
 data class AppPrefs(
     val voiceEnabled: Boolean = true,
+    /** The first-run "install an offline voice" prompt has been answered. */
+    val voicePromptSeen: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.AUTO,
     /** Show our own car's trail on the map. Never sent over the mesh. */
     val showTrail: Boolean = true,
@@ -213,6 +215,27 @@ interface SimulatorController {
     fun teleport(position: LatLon)
 }
 
+data class VoiceState(
+    /** An offline English text-to-speech voice is installed; null while checking. */
+    val offlineVoice: Boolean? = null,
+    /** Warning sentences pre-recorded in this build (they speak without any phone voice). */
+    val warningClips: Int = 0,
+)
+
+/**
+ * Warnings play pre-recorded clips; turn-by-turn directions need the phone's
+ * text-to-speech, which must work offline on the playa.
+ */
+interface VoiceController {
+    val state: StateFlow<VoiceState>
+    /** Re-checks the phone's voices (e.g. after returning from the install screen). */
+    fun refresh()
+    /** Plays a recorded warning and a spoken direction. */
+    fun test()
+    /** Opens Android's screen for downloading offline voice data. */
+    fun openInstall()
+}
+
 /** Service locator, initialised by [ZepApp.onCreate]. */
 object AppGraph {
     lateinit var playa: PlayaRepository
@@ -221,4 +244,5 @@ object AppGraph {
     lateinit var mesh: MeshController
     lateinit var trips: TripLog
     lateinit var sim: SimulatorController
+    lateinit var voice: VoiceController
 }

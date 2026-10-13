@@ -15,8 +15,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -92,6 +94,7 @@ private fun AppSection(vm: MainViewModel) {
             checked = prefs.voiceEnabled,
             onChange = { vm.updatePrefs(vm.prefs.value.copy(voiceEnabled = it)) },
         )
+        VoiceStatus(vm)
 
         SectionTitle("Theme")
         RadioRow(
@@ -253,6 +256,35 @@ private fun ZoneCard(z: Zone, applies: Boolean) {
                 color = if (applies) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             z.note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+/** Recorded warnings + the phone's offline voice for directions, with install and test. */
+@Composable
+private fun VoiceStatus(vm: MainViewModel) {
+    val voice by vm.voice.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            if (voice.warningClips > 0) "Warnings: ${voice.warningClips} recorded clips, always available"
+            else "Warnings: spoken by the phone's voice (this build has no recorded clips)",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            when (voice.offlineVoice) {
+                null -> "Directions voice: checking…"
+                true -> "Directions voice: offline English voice installed"
+                false -> "Directions voice: no offline English voice. Directions won't be spoken without internet."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (voice.offlineVoice == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = vm::testVoice) { Text("Test voice") }
+            if (voice.offlineVoice == false) {
+                Button(onClick = vm::installVoice) { Text("Install voice") }
+                TextButton(onClick = vm::refreshVoice) { Text("Check again") }
+            }
         }
     }
 }

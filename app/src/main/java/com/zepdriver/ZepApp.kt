@@ -8,6 +8,7 @@ import com.zepdriver.data.TripLogImpl
 import com.zepdriver.drive.DriveControllerImpl
 import com.zepdriver.drive.DriveEngine
 import com.zepdriver.drive.SimulatorControllerImpl
+import com.zepdriver.drive.VoiceControllerImpl
 import com.zepdriver.mesh.MeshControllerImpl
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +47,7 @@ class ZepApp : Application() {
         AppGraph.drive = DriveControllerImpl(this, engine)
         // Playa simulator for testing at home: debug builds only, always starts off.
         AppGraph.sim = SimulatorControllerImpl(engine, mesh, available = BuildConfig.DEBUG)
+        AppGraph.voice = VoiceControllerImpl(this, appScope)
 
         playa.start()
         mesh.start()

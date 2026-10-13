@@ -74,7 +74,7 @@ android {
 
     // Keep GeoJSON bundles uncompressed so MapLibre can read them quickly.
     androidResources {
-        noCompress += listOf("geojson", "pbf")
+        noCompress += listOf("geojson", "pbf", "ogg")
     }
 }
 

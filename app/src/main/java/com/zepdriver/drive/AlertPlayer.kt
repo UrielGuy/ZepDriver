@@ -10,15 +10,12 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.zepdriver.AppPrefs
 import com.zepdriver.core.alerts.Alert
 import com.zepdriver.core.alerts.AlertLevel
 import com.zepdriver.core.rules.DriveState
 import kotlinx.coroutines.flow.StateFlow
-import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -64,11 +61,8 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
     private val focusUsers = AtomicInteger(0)
     private val abandonFocus = Runnable { if (focusUsers.get() == 0) audio?.abandonAudioFocusRequest(focusRequest) }
 
-    @Volatile private var ttsReady = false
-    private val tts: TextToSpeech = TextToSpeech(app) { status ->
-        if (status == TextToSpeech.SUCCESS) onTtsReady()
-    }
-    private var utteranceSeq = 0
+    /** Bundled clips for fixed warnings, the phone's text-to-speech for the rest. */
+    private val voice = VoiceOut(app, mediaAttributes, onBusy = ::acquireFocus, onIdle = ::releaseFocus)
 
     // Per-alert bookkeeping (accessed only from the caller's thread).
     private class Seen(var level: AlertLevel, var lastSound: Long, var lastSpeech: Long)
@@ -80,20 +74,6 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
     private var lastNavSpeechAt = 0L
 
     private class Utterance(val priority: Int, val text: String)
-
-    private fun onTtsReady() {
-        tts.setLanguage(Locale.US)
-        tts.setAudioAttributes(mediaAttributes)
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
-            override fun onDone(utteranceId: String?) = releaseFocus()
-            @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) = releaseFocus()
-            override fun onError(utteranceId: String?, errorCode: Int) = releaseFocus()
-            override fun onStop(utteranceId: String?, interrupted: Boolean) = releaseFocus()
-        })
-        ttsReady = true
-    }
 
     /**
      * Call once per drive update with the new state and the navigation prompt,
@@ -171,25 +151,20 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
     private fun Alert.speechOrTitle(): String? = speech ?: title.takeIf { it.isNotBlank() }
 
     private fun speak(utterances: List<Utterance>, warped: Boolean = false) {
-        if (utterances.isEmpty() || !ttsReady || !prefs.value.voiceEnabled) return
+        if (utterances.isEmpty() || !prefs.value.voiceEnabled) return
         val ordered = utterances.sortedByDescending { it.priority }
         val urgent = ordered.first().priority >= 3
         if (warped) {
             // Only the most important line, and only alarms cut in.
             val u = ordered.first()
-            if (u.priority < 4 && tts.isSpeaking) return
-            acquireFocus()
-            val result = tts.speak(u.text, TextToSpeech.QUEUE_FLUSH, null, "zep-${utteranceSeq++}")
-            if (result != TextToSpeech.SUCCESS) releaseFocus()
+            if (u.priority < 4 && voice.busy) return
+            voice.say(u.text, flush = true)
             return
         }
         for ((i, u) in ordered.take(3).withIndex()) {
             // Advisories are dropped rather than queued behind something more important.
-            if (u.priority <= 1 && (urgent || tts.isSpeaking)) continue
-            val mode = if (i == 0 && u.priority >= 4) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
-            acquireFocus()
-            val result = tts.speak(u.text, mode, null, "zep-${utteranceSeq++}")
-            if (result != TextToSpeech.SUCCESS) releaseFocus()
+            if (u.priority <= 1 && (urgent || voice.busy)) continue
+            voice.say(u.text, flush = i == 0 && u.priority >= 4)
         }
     }
 
@@ -229,12 +204,7 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
 
     fun release() {
         toneExecutor.shutdownNow()
-        try {
-            tts.stop()
-            tts.shutdown()
-        } catch (e: Exception) {
-            Log.w(TAG, "tts shutdown failed", e)
-        }
+        voice.release()
         mainHandler.removeCallbacks(abandonFocus)
         audio?.abandonAudioFocusRequest(focusRequest)
     }

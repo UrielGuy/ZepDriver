@@ -180,6 +180,17 @@ and routing:
 
 ---
 
+## 8a. Voice
+
+- Every fixed warning sentence (speed, zones, license, sound policy) is
+  pre-recorded at build time with Piper's public-domain LJSpeech voice and
+  bundled, so warnings always speak, even without an offline phone voice.
+  The sentences come from one catalog in core (`Speech`), checked by tests.
+- Turn-by-turn directions (camp and street names) use the phone's
+  text-to-speech. On first run, and in Settings, the app checks for an
+  offline English voice and offers Android's install screen, plus a Test
+  voice button.
+
 ## 9. Day / night themes
 
 - Chosen automatically from the ambient light sensor, with hysteresis.
