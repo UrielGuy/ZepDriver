@@ -9,7 +9,9 @@ import java.util.zip.ZipInputStream
 /**
  * Where to get Meshtastic firmware for the recommended board (Heltec V3).
  *
- * The firmware is GPL-3 and is downloaded at runtime, never bundled in the APK.
+ * The firmware is GPL-3. The app build bundles this image (see the
+ * bundleFirmware task in app/build.gradle.kts, which reads the pins below);
+ * the app downloads it only if the bundled copy is missing.
  *
  * Pinned: **v2.7.26.54e0d8d**. Evidence (gathered 2026-10-13):
  * - `git ls-remote --tags https://github.com/meshtastic/firmware` lists
