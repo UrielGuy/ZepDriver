@@ -48,7 +48,7 @@ fun SettingsScreen(vm: MainViewModel, bundle: PlayaBundle, ui: DriveUiState) {
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            for (s in SettingsSection.entries) {
+            for (s in SettingsSection.entries.filter { it != SettingsSection.SIMULATOR || vm.sim.available }) {
                 FilterChip(
                     selected = s == section,
                     onClick = { vm.setSettingsSection(s) },
@@ -65,6 +65,7 @@ fun SettingsScreen(vm: MainViewModel, bundle: PlayaBundle, ui: DriveUiState) {
                 SettingsSection.TRIPS -> TripSection(vm)
                 SettingsSection.DATA -> DataSection(vm, bundle)
                 SettingsSection.RULES -> RulesSection(vm, bundle)
+                SettingsSection.SIMULATOR -> SimulatorSection(vm)
             }
         }
     }

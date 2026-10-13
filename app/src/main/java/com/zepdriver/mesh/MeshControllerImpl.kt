@@ -18,6 +18,7 @@ import com.zepdriver.core.mesh.MeshProtocol
 import com.zepdriver.core.mesh.MeshText
 import com.zepdriver.core.mesh.StreamFraming
 import com.zepdriver.core.rules.DrivingMode
+import com.zepdriver.core.sim.FakeFleet
 import com.zepdriver.data.Net
 import com.zepdriver.data.TripLogImpl
 import kotlinx.coroutines.CancellationException
@@ -80,6 +81,8 @@ class MeshControllerImpl(
     private var lastSentAt = 0L
     private var lastSentFix: Fix? = null
     private var lastSentMode: DrivingMode? = null
+    /** Simulator vehicles (debug builds): shown in [fleet], never persisted or transmitted. */
+    private var simVehicles: List<FleetVehicle> = emptyList()
 
     // --- connection status (written on the mesh thread) ---
     @Volatile private var nameBlank = settings.profile.value.carName.isBlank()
@@ -191,6 +194,26 @@ class MeshControllerImpl(
     override fun flashUsbRadio() = startUsbJob(flash = true)
 
     override fun provisionUsbRadio() = startUsbJob(flash = false)
+
+    // --- simulator (debug builds) ------------------------------------------------------
+
+    /** Replaces the simulated vehicles shown alongside the real fleet. */
+    fun setSimulatedVehicles(list: List<FleetVehicle>) = onMesh {
+        simVehicles = list
+        publishFleet(persist = false)
+    }
+
+    /** Shows a message from a simulated car. It is never sent over the radio or saved. */
+    fun addSimulatedMessage(message: MeshText) = onMesh {
+        _messages.value = (_messages.value + message).takeLast(MAX_MESSAGES)
+    }
+
+    /** Removes every simulated vehicle and message. */
+    fun clearSimulated() = onMesh {
+        simVehicles = emptyList()
+        publishFleet(persist = false)
+        _messages.value = _messages.value.filterNot { FakeFleet.isSimulated(it.fromNode) }
+    }
 
     // --- position sharing (called by the drive engine for every fix) ----------------
 
@@ -330,14 +353,14 @@ class MeshControllerImpl(
 
     private fun pruneFleet() {
         val cutoff = System.currentTimeMillis() - FLEET_MAX_AGE_MS
-        if (vehicles.values.removeAll { it.lastHeardMillis < cutoff } || _fleet.value.size != vehicles.size) {
+        if (vehicles.values.removeAll { it.lastHeardMillis < cutoff } || _fleet.value.size != vehicles.size + simVehicles.size) {
             publishFleet()
         }
     }
 
-    private fun publishFleet() {
-        _fleet.value = vehicles.values.sortedByDescending { it.lastHeardMillis }
-        persistSoon()
+    private fun publishFleet(persist: Boolean = true) {
+        _fleet.value = (vehicles.values + simVehicles).sortedByDescending { it.lastHeardMillis }
+        if (persist) persistSoon()
     }
 
     private fun appendMessage(m: MeshText) {
@@ -351,8 +374,9 @@ class MeshControllerImpl(
         saveJob?.cancel()
         saveJob = scope.launch(meshThread) {
             delay(3_000)
-            val fleet = _fleet.value
-            val messages = _messages.value
+            // Simulated cars and messages are never saved.
+            val fleet = _fleet.value.filterNot { FakeFleet.isSimulated(it.nodeNum) }
+            val messages = _messages.value.filterNot { FakeFleet.isSimulated(it.fromNode) }
             withContext(Dispatchers.IO) { store.save(fleet, messages) }
         }
     }

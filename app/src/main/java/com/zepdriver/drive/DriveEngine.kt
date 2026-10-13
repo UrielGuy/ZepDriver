@@ -22,12 +22,15 @@ import com.zepdriver.data.TripLogImpl
 import com.zepdriver.mesh.MeshControllerImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
@@ -69,6 +72,10 @@ class DriveEngine(
     private var lastLogged: Fix? = null
     private var lastLoggedLevel = AlertLevel.NONE
 
+    /** Non-null while the playa simulator replaces GPS (debug builds). */
+    private var sim: SimFixSource? = null
+    private var simJob: Job? = null
+
     init {
         scope.launch(engine) {
             combine(playa.bundle, settings.profile) { b, p -> b to p }.collect { (b, p) -> onConfig(b, p) }
@@ -83,7 +90,42 @@ class DriveEngine(
 
     fun setServiceRunning(running: Boolean) = _state.update { it.copy(serviceRunning = running) }
 
-    fun onFix(fix: Fix) = post { process(fix) }
+    /** A real GPS fix; ignored while the simulator is driving. */
+    fun onFix(fix: Fix) = post { if (sim == null) process(fix) }
+
+    // --- called by SimulatorControllerImpl ---------------------------------------
+
+    /**
+     * Replaces GPS with [source], ticked at 1 Hz on the engine thread, or goes
+     * back to GPS with null. Either way the drive starts afresh: navigation
+     * ends and the monitor forgets the previous track.
+     */
+    fun setSimulation(source: SimFixSource?) = post {
+        if (source === sim) return@post
+        sim = source
+        simJob?.cancel()
+        simJob = null
+        resetDrive()
+        if (source != null) {
+            simJob = scope.launch(engine) {
+                var last = SystemClock.elapsedRealtime()
+                while (isActive) {
+                    val now = SystemClock.elapsedRealtime()
+                    val dt = (now - last).coerceIn(0L, MAX_SIM_STEP_MS)
+                    last = now
+                    try {
+                        tickSim(source, dt)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "simulator tick failed", e)
+                    }
+                    delay((SIM_TICK_MS - (SystemClock.elapsedRealtime() - now)).coerceIn(10L, SIM_TICK_MS))
+                }
+            }
+        }
+    }
+
+    /** Runs [block] on the engine thread (where the simulator's state lives). */
+    fun onEngine(block: () -> Unit) = post(block)
 
     // --- called by DriveControllerImpl ----------------------------------------
 
@@ -107,6 +149,29 @@ class DriveEngine(
     fun goToPotties() = post { potties() }
 
     // --- internals (engine thread) ------------------------------------------
+
+    private fun tickSim(source: SimFixSource, dtMillis: Long) {
+        if (sim !== source) return
+        val b = bundle ?: return
+        val fix = source.nextFix(b.data, System.currentTimeMillis(), dtMillis, _state.value.nav) ?: return
+        process(fix, simulated = true)
+    }
+
+    /** Forgets the current drive when switching between GPS and the simulator. */
+    private fun resetDrive() {
+        session = null
+        pending = null
+        pendingPotties = false
+        lastFix = null
+        lastFixAt = 0L
+        lastLogged = null
+        lastLoggedLevel = AlertLevel.NONE
+        bundle?.let { b ->
+            monitor = runCatching { DriveMonitor(b.data, b.ruleSet, profile) }
+                .onFailure { Log.e(TAG, "DriveMonitor failed", it) }.getOrNull()
+        }
+        _state.update { it.copy(drive = null, nav = null, stops = emptyList(), message = null) }
+    }
 
     private fun post(block: () -> Unit) {
         scope.launch(engine) {
@@ -251,7 +316,7 @@ class DriveEngine(
         _state.update { it.copy(nav = null, stops = emptyList(), message = message) }
     }
 
-    private fun process(fix: Fix) {
+    private fun process(fix: Fix, simulated: Boolean = false) {
         lastFix = fix
         lastFixAt = SystemClock.elapsedRealtime()
         // Rebuild on the first fix of a new hour so time-bound zones (burn nights etc.) stay current.
@@ -295,7 +360,8 @@ class DriveEngine(
             }
         }
         logTrip(fix, drive)
-        mesh.onFix(fix, drive.mode)
+        // Simulated positions never go out over the mesh: other cars would see a phantom.
+        if (!simulated) mesh.onFix(fix, drive.mode)
 
         pending?.let { tryStart(it) }
         if (pendingPotties) potties()
@@ -340,5 +406,7 @@ class DriveEngine(
         const val TAG = "DriveEngine"
         const val STALE_FIX_MS = 30_000L
         const val HOUR_MS = 3_600_000L
+        const val SIM_TICK_MS = 1_000L
+        const val MAX_SIM_STEP_MS = 3_000L
     }
 }
