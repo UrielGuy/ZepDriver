@@ -80,7 +80,7 @@ object RuleSet2026 : RuleSet {
                         Clock.parse(walkIn.fromClock)!!.toDouble(),
                         Clock.parse(walkIn.toClock)!!.toDouble(),
                         // VERIFY: depth of walk-in camping beyond K.
-                        innerFt = k.radiusFt + k.widthFt / 2 + 25,
+                        innerFt = k.radiusFt + k.widthFt / 2,
                         outerFt = k.radiusFt + 1400,
                     ),
                 ),
