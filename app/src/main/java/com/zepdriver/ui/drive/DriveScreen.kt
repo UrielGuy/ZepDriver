@@ -82,8 +82,11 @@ fun DriveScreen(
     }
     val fleetJson = remember(fleet, now) { GeoJson.fleet(fleet, now) }
     val focusJson = remember(focus) { GeoJson.focus(focus?.position) }
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val placesJson = remember(profile.homeCamp, favorites) { GeoJson.places(profile.homeCamp, favorites) }
     val layers = staticLayers
-    val sources = remember(zonesJson, layers, trailJson, meJson, routeJson, stopsJson, fleetJson, focusJson) {
+    val sources = remember(zonesJson, layers, trailJson, meJson, routeJson, stopsJson, fleetJson, focusJson, placesJson) {
         buildMap {
             put(MapStyle.SRC_ZONES, zonesJson)
             if (layers != null) {
@@ -91,7 +94,9 @@ fun DriveScreen(
                 put(MapStyle.SRC_ART_POINTS, layers.artPoints)
                 put(MapStyle.SRC_CAMPS, layers.camps)
                 put(MapStyle.SRC_TOILET_POINTS, layers.toiletPoints)
+                put(MapStyle.SRC_LANDMARKS, layers.landmarks)
             }
+            put(MapStyle.SRC_PLACES, placesJson)
             put(MapStyle.SRC_TRAIL, trailJson)
             put(MapStyle.SRC_ROUTE, routeJson)
             put(MapStyle.SRC_STOPS, stopsJson)

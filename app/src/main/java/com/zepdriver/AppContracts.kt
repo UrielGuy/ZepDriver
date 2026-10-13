@@ -66,7 +66,7 @@ data class AppPrefs(
 @Serializable
 data class Favorite(
     val id: String,
-    /** "Home", "My art piece", or anything the driver typed. */
+    /** "Home", or the name the driver chose (defaults to the place's own name). */
     val label: String,
     val destination: Destination,
 )

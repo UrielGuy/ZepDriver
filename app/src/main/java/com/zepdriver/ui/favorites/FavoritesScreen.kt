@@ -43,7 +43,7 @@ import com.zepdriver.ui.MainViewModel
 import com.zepdriver.ui.common.EmptyHint
 import com.zepdriver.ui.common.FavoriteLabelDialog
 
-/** Saved places: Home, My art piece and custom ones. */
+/** Saved places: Home and any named ones. */
 @Composable
 fun FavoritesScreen(vm: MainViewModel, ui: DriveUiState) {
     val favorites by vm.favorites.collectAsStateWithLifecycle()
@@ -61,7 +61,7 @@ fun FavoritesScreen(vm: MainViewModel, ui: DriveUiState) {
             if (favorites.isEmpty()) {
                 EmptyHint(
                     "No favorites yet",
-                    "Save your camp as Home and your art piece as My art piece, from Search or from where you're parked right now.",
+                    "Save your camp as Home, and anything else (your art piece, friends' camps) by name, from Search or from where you're parked right now.",
                 )
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
@@ -91,7 +91,7 @@ fun FavoritesScreen(vm: MainViewModel, ui: DriveUiState) {
 
     if (savingHere) {
         FavoriteLabelDialog(
-            initialCustom = "",
+            initialCustom = vm.drive.value.drive?.address.orEmpty(),
             title = "Save this spot as",
             onDismiss = { savingHere = false },
             onSave = { label ->

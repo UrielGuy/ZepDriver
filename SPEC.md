@@ -130,7 +130,7 @@ and routing:
 ### 6.3 Search and favorites
 
 - Full-text search over camps and art (name, description, address).
-- Favorites with labels: Home, My art piece, plus any custom places.
+- Favorites named by the driver (defaulting to the place's own name), plus Home. Home is always shown on the map; favorites are marked on it too.
 
 ---
 
@@ -140,6 +140,9 @@ and routing:
 - 3D view (tilted, heading-up while moving) with extruded art pieces,
   camp blocks, other app vehicles (from the mesh) and the active route.
 - Zones rendered by type (no-entry, cross-only, active time-bound).
+- 3D models of the Man (on the 2026 "Cryptomeria" tower), the Temple
+  ("Temple of the Moon") and Center Camp's Canopy.
+- Home always shown; favorites marked with their names.
 
 ---
 

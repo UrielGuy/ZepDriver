@@ -27,7 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -117,7 +117,10 @@ fun DestinationSheet(
     }
 }
 
-/** Asks for a favorite's label: Home, My art piece, or a custom name. */
+/**
+ * Asks for a favorite's name, defaulting to [initialCustom] (the place's own
+ * name), with an option to make it the car's Home camp instead.
+ */
 @Composable
 fun FavoriteLabelDialog(
     initialCustom: String,
@@ -125,36 +128,31 @@ fun FavoriteLabelDialog(
     onSave: (String) -> Unit,
     title: String = "Save as favorite",
 ) {
-    val presets = listOf(MainViewModel.LABEL_HOME, MainViewModel.LABEL_ART)
-    var choice by remember { mutableStateOf(MainViewModel.LABEL_HOME) }
-    var custom by remember { mutableStateOf(initialCustom) }
-    val isCustom = choice !in presets
-    val label = if (isCustom) custom.trim() else choice
+    var name by remember { mutableStateOf(initialCustom) }
+    var home by remember { mutableStateOf(false) }
+    val label = if (home) MainViewModel.LABEL_HOME else name.trim()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             Column {
-                for (p in presets) {
-                    LabelOption(p, selected = choice == p) { choice = p }
-                }
-                LabelOption("Custom name", selected = isCustom) { choice = "" }
-                if (isCustom) {
-                    OutlinedTextField(
-                        value = custom,
-                        onValueChange = { custom = it },
-                        singleLine = true,
-                        label = { Text("Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                if (choice == MainViewModel.LABEL_HOME) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    enabled = !home,
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                LabelOption("This is my Home camp", selected = home) { home = !home }
+                if (home) {
                     Text(
-                        "Also sets your home camp in the car profile.",
+                        "Saved as Home, always shown on the map, and set as your home camp in the car profile.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }
@@ -171,11 +169,11 @@ private fun LabelOption(text: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+            .selectable(selected = selected, onClick = onClick, role = Role.Checkbox)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = null)
+        Checkbox(checked = selected, onCheckedChange = null)
         Spacer(Modifier.width(8.dp))
         Text(text, style = MaterialTheme.typography.bodyLarge)
     }

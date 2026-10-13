@@ -42,6 +42,15 @@ data class MapPalette(
     val me: String,
     val meStroke: String,
     val focus: String,
+    /** Landmark models (Man, Temple, Center Camp). */
+    val wood: String,
+    val woodDark: String,
+    val figure: String,
+    val canopy: String,
+    val mast: String,
+    /** Home marker and saved favorites. */
+    val home: String,
+    val favorite: String,
 )
 
 object MapPalettes {
@@ -79,6 +88,13 @@ object MapPalettes {
         me = "#111111",
         meStroke = "#FFFFFF",
         focus = "#D3221B",
+        wood = "#B98A55",
+        woodDark = "#8A6238",
+        figure = "#5E3F22",
+        canopy = "#F6F1E6",
+        mast = "#7A7A7A",
+        home = "#1F4FD1",
+        favorite = "#E0A800",
     )
 
     /** Dark, dim and red/amber shifted to keep night vision. */
@@ -115,6 +131,13 @@ object MapPalettes {
         me = "#FF4A26",
         meStroke = "#FFD2B8",
         focus = "#FF4A26",
+        wood = "#6E4A2C",
+        woodDark = "#4E321D",
+        figure = "#C9762E",
+        canopy = "#5A4636",
+        mast = "#3C2E24",
+        home = "#FF9A3D",
+        favorite = "#D9AE52",
     )
 }
 
@@ -138,10 +161,13 @@ object MapStyle {
     const val SRC_FLEET = "fleet"
     const val SRC_ME = "me"
     const val SRC_FOCUS = "focus"
+    const val SRC_LANDMARKS = "landmarks"
+    const val SRC_PLACES = "places"
 
     val DYNAMIC_SOURCES = listOf(
         SRC_ZONES, SRC_ART, SRC_ART_POINTS, SRC_CAMPS, SRC_TOILET_POINTS,
         SRC_TRAIL, SRC_ROUTE, SRC_STOPS, SRC_FLEET, SRC_ME, SRC_FOCUS,
+        SRC_LANDMARKS, SRC_PLACES,
     )
 
     /**
@@ -228,6 +254,21 @@ object MapStyle {
             "fill-extrusion-base" to 0.0,
             "fill-extrusion-opacity" to p.blockOpacity,
         ))
+        // The Man, the Temple and Center Camp's Canopy, modeled in 3D.
+        layer("landmarks", "fill-extrusion", SRC_LANDMARKS, paint = mapOf(
+            "fill-extrusion-color" to listOf(
+                "match", listOf("get", "part"),
+                "WOOD", p.wood,
+                "WOOD_DARK", p.woodDark,
+                "FIGURE", p.figure,
+                "CANOPY", p.canopy,
+                "MAST", p.mast,
+                p.wood,
+            ),
+            "fill-extrusion-base" to listOf("get", "base"),
+            "fill-extrusion-height" to listOf("get", "top"),
+            "fill-extrusion-opacity" to 0.95,
+        ))
         layer("art", "fill-extrusion", SRC_ART, minzoom = 13.0, paint = mapOf(
             "fill-extrusion-color" to p.art,
             "fill-extrusion-height" to 6.0,
@@ -284,6 +325,37 @@ object MapStyle {
                 "text-max-angle" to 30,
             ),
             paint = mapOf("text-color" to p.streetLabel) + halo(),
+        )
+        // Home (always visible) and saved favorites.
+        val isHome = eq("kind", "home")
+        layer("places", "circle", SRC_PLACES, paint = mapOf(
+            "circle-color" to listOf("case", isHome, p.home, p.favorite),
+            "circle-radius" to listOf("case", isHome, 10.0, 7.0),
+            "circle-stroke-color" to p.labelHalo,
+            "circle-stroke-width" to 2.5,
+        ))
+        layer("home-label", "symbol", SRC_PLACES, isHome,
+            layout = mapOf(
+                "text-field" to listOf("get", "name"),
+                "text-font" to font(),
+                "text-size" to 15,
+                "text-anchor" to "top",
+                "text-offset" to listOf(0.0, 0.9),
+                "text-allow-overlap" to true,
+                "text-ignore-placement" to true,
+            ),
+            paint = mapOf("text-color" to p.home) + halo(),
+        )
+        layer("favorite-labels", "symbol", SRC_PLACES, listOf("!", isHome), minzoom = 13.0,
+            layout = mapOf(
+                "text-field" to listOf("get", "name"),
+                "text-font" to font(),
+                "text-size" to 12,
+                "text-anchor" to "top",
+                "text-offset" to listOf(0.0, 0.8),
+                "text-max-width" to 8,
+            ),
+            paint = mapOf("text-color" to p.favorite) + halo(),
         )
         layer("camps", "circle", SRC_CAMPS, minzoom = 15.0, paint = mapOf(
             "circle-color" to p.camp,

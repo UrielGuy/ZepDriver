@@ -52,6 +52,7 @@ data class StaticLayers(
     val artPoints: String,
     val camps: String,
     val toiletPoints: String,
+    val landmarks: String,
 )
 
 /** True when the UI must be locked to the driving view (moving or navigating). */
@@ -141,6 +142,7 @@ class MainViewModel : ViewModel() {
                         artPoints = GeoJson.artPoints(b.data),
                         camps = GeoJson.camps(b.data),
                         toiletPoints = GeoJson.toiletPoints(b.data),
+                        landmarks = GeoJson.landmarks(b.data),
                     )
                 }
                 _zones.value = withContext(Dispatchers.Default) {
@@ -304,7 +306,6 @@ class MainViewModel : ViewModel() {
         val clean = label.trim().ifEmpty { dest.name }
         val id = when (clean) {
             LABEL_HOME -> "home"
-            LABEL_ART -> "my-art"
             else -> UUID.randomUUID().toString()
         }
         AppGraph.settings.saveFavorite(Favorite(id = id, label = clean, destination = dest))
@@ -377,6 +378,5 @@ class MainViewModel : ViewModel() {
 
     companion object {
         const val LABEL_HOME = "Home"
-        const val LABEL_ART = "My art piece"
     }
 }

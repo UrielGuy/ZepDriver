@@ -1,9 +1,12 @@
 package com.zepdriver.ui.map
 
+import com.zepdriver.Favorite
 import com.zepdriver.core.data.PlayaData
+import com.zepdriver.core.geo.FEET_PER_METER
 import com.zepdriver.core.geo.Fix
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.geo.Xy
+import com.zepdriver.core.landmarks.Landmarks
 import com.zepdriver.core.mesh.FleetVehicle
 import com.zepdriver.core.nav.Destination
 import com.zepdriver.core.nav.NavState
@@ -143,6 +146,40 @@ object GeoJson {
         }
         return b.build()
     }
+
+    /** The 3D landmark models; heights in meters for fill-extrusion. */
+    fun landmarks(data: PlayaData): String {
+        val b = Builder()
+        for (p in Landmarks.build(data)) {
+            b.polygon(
+                listOf(p.outer.map { data.ll(it) }) + p.holes.map { h -> h.map { data.ll(it) } },
+                mapOf(
+                    "part" to p.part.name,
+                    "base" to p.baseFt / FEET_PER_METER,
+                    "top" to p.topFt / FEET_PER_METER,
+                ),
+            )
+        }
+        return b.build()
+    }
+
+    /**
+     * Home (from the car profile, or a favorite saved as Home) plus the other
+     * favorites, as points with `kind` "home" or "favorite".
+     */
+    fun places(home: LatLon?, favorites: List<Favorite>): String {
+        val b = Builder()
+        val homeFavorite = favorites.firstOrNull { it.label == HOME_LABEL }
+        val homeAt = home ?: homeFavorite?.destination?.position
+        if (homeAt != null) b.point(homeAt, mapOf("kind" to "home", "name" to HOME_LABEL))
+        for (f in favorites) {
+            if (f === homeFavorite) continue
+            b.point(f.destination.position, mapOf("kind" to "favorite", "name" to f.label))
+        }
+        return b.build()
+    }
+
+    private const val HOME_LABEL = "Home"
 
     /** Small square footprints around each art piece, extruded on the map. */
     fun artFootprints(data: PlayaData, halfSizeFt: Double = 15.0): String {
