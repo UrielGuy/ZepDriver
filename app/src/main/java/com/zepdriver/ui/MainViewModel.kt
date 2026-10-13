@@ -55,9 +55,14 @@ data class StaticLayers(
     val landmarks: String,
 )
 
-/** True when the UI must be locked to the driving view (moving or navigating). */
-fun DriveUiState.isLocked(): Boolean =
-    drive?.mode == DrivingMode.MOVING || (nav != null && nav?.finished == false)
+/**
+ * True when the UI must be locked to the driving view: whenever the car is
+ * moving. Stopped mid-route the app unlocks, so stops can be added.
+ */
+fun DriveUiState.isLocked(): Boolean = drive?.mode == DrivingMode.MOVING
+
+/** A route is active (not yet finished). */
+fun DriveUiState.isNavigating(): Boolean = nav != null && nav?.finished == false
 
 class MainViewModel : ViewModel() {
     // --- Platform state, straight from the contracts -------------------------
@@ -85,6 +90,10 @@ class MainViewModel : ViewModel() {
 
     private val _recenter = MutableStateFlow(0)
     val recenter: StateFlow<Int> = _recenter.asStateFlow()
+
+    // The driver panned or zoomed the map: stop following the car until Recenter.
+    private val _mapDetached = MutableStateFlow(false)
+    val mapDetached: StateFlow<Boolean> = _mapDetached.asStateFlow()
 
     private val _toasts = MutableSharedFlow<String>(extraBufferCapacity = 8)
     /** Short confirmations for the snackbar ("Added to route"). */
@@ -225,7 +234,17 @@ class MainViewModel : ViewModel() {
 
     fun recenter() {
         _focus.value = null
+        _mapDetached.value = false
         _recenter.update { it + 1 }
+    }
+
+    fun onMapGesture() {
+        _mapDetached.value = true
+    }
+
+    /** Starting to drive or navigate picks the car up again, whatever the map was doing. */
+    fun resumeFollowing() {
+        _mapDetached.value = false
     }
 
     fun toast(text: String) {
@@ -241,9 +260,13 @@ class MainViewModel : ViewModel() {
         AppGraph.drive.goToPotties()
     }
 
+    /** Next stop of the current route if there is one, else a new route to [dest]. */
     fun goNow(dest: Destination) {
-        AppGraph.drive.navigate(listOf(dest))
+        val navigating = drive.value.isNavigating()
+        AppGraph.drive.goNow(dest)
+        if (navigating) toast("Next stop: ${dest.name}")
         _focus.value = null
+        _mapDetached.value = false
         _tab.value = Tab.DRIVE
     }
 

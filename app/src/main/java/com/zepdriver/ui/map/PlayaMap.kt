@@ -26,8 +26,12 @@ import org.maplibre.android.style.sources.GeoJsonSource
 
 /** How the camera should behave. */
 data class MapCamera(
-    /** Moving: follow the vehicle heading-up at [pitchDeg]. Parked: free overview. */
+    /** Follow the vehicle heading-up at [pitchDeg] (moving or on a route). Otherwise a free overview. */
     val follow: Boolean,
+    /** The driver has panned/zoomed: leave the camera where they put it until re-centered. */
+    val detached: Boolean = false,
+    /** Called when the driver starts a pan/zoom/rotate gesture. */
+    val onUserGesture: () -> Unit = {},
     val fix: Fix?,
     val pitchDeg: Double,
     /** Bearing for the parked overview (BRC 12:00 up). */
@@ -99,7 +103,7 @@ fun PlayaMap(
     SideEffect {
         controller.setStyle(styleJson)
         controller.setSources(sources)
-        controller.setGesturesEnabled(!camera.follow)
+        controller.onUserGesture = camera.onUserGesture
     }
 
     // Moving: follow every fix, heading-up.
@@ -107,9 +111,10 @@ fun PlayaMap(
         val fix = camera.fix
         if (camera.follow && fix != null) controller.follow(fix, camera.pitchDeg)
     }
-    // Parked: overview on entering parked mode, on the first fix and on "recenter".
+    // Parked: overview on entering parked mode, on the first fix and on "recenter",
+    // but never yank the camera away from where the driver just moved it.
     LaunchedEffect(camera.follow, camera.recenterKey, camera.fix != null) {
-        if (!camera.follow) {
+        if (!camera.follow && !camera.detached) {
             controller.overview(camera.fix?.position ?: camera.home, camera.overviewBearing, camera.pitchDeg, camera.fix == null)
         }
     }
@@ -128,8 +133,8 @@ private class PlayaMapController {
     private val sources = HashMap<String, String>()
     private val applied = HashMap<String, String>()
     private var pendingCamera: CameraPosition? = null
-    private var gestures = true
     private var released = false
+    var onUserGesture: () -> Unit = {}
 
     fun onMapReady(m: MapLibreMap) {
         if (released) return
@@ -137,7 +142,10 @@ private class PlayaMapController {
         m.uiSettings.setLogoEnabled(false)
         m.uiSettings.setAttributionEnabled(false)
         m.uiSettings.setCompassEnabled(true)
-        m.uiSettings.setAllGesturesEnabled(gestures)
+        m.uiSettings.setAllGesturesEnabled(true)
+        m.addOnCameraMoveStartedListener { reason ->
+            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) onUserGesture()
+        }
         m.setMinZoomPreference(11.0)
         m.setMaxZoomPreference(20.0)
         pendingCamera?.let { m.moveCamera(CameraUpdateFactory.newCameraPosition(it)) }
@@ -178,12 +186,6 @@ private class PlayaMapController {
             src.setGeoJson(json)
             applied[id] = json
         }
-    }
-
-    fun setGesturesEnabled(enabled: Boolean) {
-        if (enabled == gestures) return
-        gestures = enabled
-        map?.uiSettings?.setAllGesturesEnabled(enabled)
     }
 
     fun follow(fix: Fix, pitchDeg: Double) {

@@ -26,7 +26,11 @@ ruleset.
 | Mode | Entered when | What the driver can do |
 |------|--------------|------------------------|
 | **Parked** | Speed < ~0.5 mph for a few seconds and no active route | Everything: search, favorites, settings, plan routes, messaging, flashing the radio, export trips |
-| **Moving** | Speed above threshold, or a route is active | Read-only. The only live control is the **Potties** button (inserts nearest porta-potty bank as the next stop) |
+| **Moving** | Speed above threshold | Read-only. Live controls: the **Potties** button (inserts nearest porta-potty bank as the next stop), and panning/zooming the map with **Re-center** |
+
+Stopped mid-route the app unlocks: searching and choosing **Go now** makes
+the place the next stop of the current route (or starts a route if there is
+none).
 
 Warnings, voice, mesh position sharing and trip logging run in both modes.
 Mode switching uses hysteresis so stop-and-go traffic doesn't flap.

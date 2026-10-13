@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +66,7 @@ fun DriveScreen(
     val draft by vm.draftStops.collectAsStateWithLifecycle()
     val focus by vm.focus.collectAsStateWithLifecycle()
     val recenter by vm.recenter.collectAsStateWithLifecycle()
+    val detached by vm.mapDetached.collectAsStateWithLifecycle()
     val now by rememberNow(15_000L)
 
     val data = bundle.data
@@ -105,8 +109,14 @@ fun DriveScreen(
             put(MapStyle.SRC_FOCUS, focusJson)
         }
     }
+    // Follow the car while moving or on a route, until the driver pans or zooms.
+    val wantsFollow = locked || navigating
+    val following = wantsFollow && !detached
+    LaunchedEffect(wantsFollow) { if (wantsFollow) vm.resumeFollowing() }
     val camera = MapCamera(
-        follow = locked,
+        follow = following,
+        detached = detached,
+        onUserGesture = vm::onMapGesture,
         fix = fix,
         pitchDeg = prefs.mapPitchDeg,
         overviewBearing = data.layout.twelveOClockBearingDeg,
@@ -120,8 +130,8 @@ fun DriveScreen(
     // Screen-up is the vehicle heading while following, else the overview's 12:00-up.
     var lastHeading by remember { mutableStateOf(data.layout.twelveOClockBearingDeg) }
     val heading = fix?.bearingDeg
-    SideEffect { if (locked && heading != null) lastHeading = heading }
-    val screenUp = if (locked) lastHeading else data.layout.twelveOClockBearingDeg
+    SideEffect { if (following && heading != null) lastHeading = heading }
+    val screenUp = if (wantsFollow) lastHeading else data.layout.twelveOClockBearingDeg
     val toiletFinder = remember(data) { ToiletFinder(data) }
     val potty = remember(fix?.position, prefs.showPottyArrow) {
         if (prefs.showPottyArrow) fix?.position?.let(toiletFinder::nearest) else null
@@ -160,7 +170,15 @@ fun DriveScreen(
                 Speedometer(drive?.speedMph, speedLevel, flashOn)
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.End) {
-                    if (!locked) {
+                    if (wantsFollow && detached) {
+                        // Like Google Maps: after panning/zooming, one tap resumes following.
+                        ExtendedFloatingActionButton(
+                            onClick = vm::recenter,
+                            icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+                            text = { Text("Re-center") },
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    } else if (!wantsFollow) {
                         FloatingActionButton(onClick = vm::recenter) {
                             Icon(Icons.Filled.LocationOn, contentDescription = "Center on my car")
                         }

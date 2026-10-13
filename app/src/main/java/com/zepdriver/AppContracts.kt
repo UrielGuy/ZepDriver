@@ -107,6 +107,8 @@ interface DriveController {
     fun stopNavigation()
     /** Inserts the nearest porta-potty bank as the next stop (works in any mode). */
     fun goToPotties()
+    /** Makes [destination] the first stop of the active route, or starts navigating to it. */
+    fun goNow(destination: Destination)
 }
 
 enum class MeshConnection { NO_CAR_NAME, DISCONNECTED, SCANNING, CONNECTING, CONNECTED, PROVISIONING, FLASHING, ERROR }

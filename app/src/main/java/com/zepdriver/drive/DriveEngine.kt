@@ -148,6 +148,16 @@ class DriveEngine(
 
     fun goToPotties() = post { potties() }
 
+    /** Makes [dest] the next stop of the current route, or starts a route to it. */
+    fun goNow(dest: Destination) = post {
+        if (session == null) {
+            pendingPotties = false
+            tryStart(listOf(dest))
+        } else {
+            insertNext(dest)
+        }
+    }
+
     // --- internals (engine thread) ------------------------------------------
 
     private fun tickSim(source: SimFixSource, dtMillis: Long) {
@@ -298,16 +308,21 @@ class DriveEngine(
             showMessage("No reachable porta-potties found")
             return
         }
-        val s = session
-        if (s != null) {
-            val nav = runCatching { s.insertNext(toilet, pos) }.getOrNull()
-            if (nav == null) {
-                showMessage("No legal route to ${toilet.name}")
-            } else {
-                _state.update { it.copy(nav = nav, stops = s.stops, message = null) }
-            }
+        if (session != null) insertNext(toilet, pos) else startSession(r, pos, listOf(toilet))
+    }
+
+    /** Puts [dest] first on the active route, replanning from [from]. */
+    private fun insertNext(dest: Destination, from: LatLon? = currentPosition()) {
+        val s = session ?: return
+        if (from == null) {
+            showMessage("Waiting for GPS")
+            return
+        }
+        val nav = runCatching { s.insertNext(dest, from) }.getOrNull()
+        if (nav == null) {
+            showMessage("No legal route to ${dest.name}")
         } else {
-            startSession(r, pos, listOf(toilet))
+            _state.update { it.copy(nav = nav, stops = s.stops, message = null) }
         }
     }
 
@@ -321,15 +336,14 @@ class DriveEngine(
         lastFixAt = SystemClock.elapsedRealtime()
         // Rebuild on the first fix of a new hour so time-bound zones (burn nights etc.) stay current.
         if (bundle != null && System.currentTimeMillis() / HOUR_MS != routerHour) rebuildRouter()
-        val navigating = session != null
         val drive = monitor?.let { m ->
             try {
-                m.update(fix, navigating)
+                m.update(fix)
             } catch (e: Throwable) {
                 Log.e(TAG, "DriveMonitor.update failed", e)
                 null
             }
-        } ?: fallbackState(fix, navigating)
+        } ?: fallbackState(fix)
 
         var nav: NavState? = null
         var navSpeech: String? = null
@@ -367,11 +381,11 @@ class DriveEngine(
         if (pendingPotties) potties()
     }
 
-    private fun fallbackState(fix: Fix, navigating: Boolean) = DriveState(
+    private fun fallbackState(fix: Fix) = DriveState(
         fix = fix,
         speedMph = fix.speedMph ?: 0.0,
         speedLevel = AlertLevel.NONE,
-        mode = if (navigating || (fix.speedMph ?: 0.0) > 1.0) DrivingMode.MOVING else DrivingMode.PARKED,
+        mode = if ((fix.speedMph ?: 0.0) > 1.0) DrivingMode.MOVING else DrivingMode.PARKED,
         alerts = emptyList(),
         address = null,
         isNight = false,

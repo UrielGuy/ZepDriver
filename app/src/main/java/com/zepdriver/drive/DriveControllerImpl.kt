@@ -40,4 +40,6 @@ class DriveControllerImpl(context: Context, val engine: DriveEngine) : DriveCont
     override fun stopNavigation() = engine.stopNavigation()
 
     override fun goToPotties() = engine.goToPotties()
+
+    override fun goNow(destination: Destination) = engine.goNow(destination)
 }
