@@ -27,6 +27,8 @@ enum class AlertKind {
     SOUND,
     /** Inside the art safe distance. */
     ART_BUFFER,
+    /** In a drive-with-care area (plazas, burn perimeters). */
+    CAUTION_AREA,
     /** Poor GPS accuracy; warnings may be unreliable. */
     GPS,
 }

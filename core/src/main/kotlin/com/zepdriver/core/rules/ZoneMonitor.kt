@@ -292,8 +292,7 @@ class ZoneMonitor(
     private fun caution(p: Prepared, c: Ctx): Alert? {
         val z = p.zone
         if (p.shapes.none { it.mayTouch(c.query) && (it.contains(c.phone) || it.contains(c.front)) }) return null
-        // AlertKind has no generic "caution area" kind; ART_BUFFER (slow down, people around) is the closest fit.
-        return Alert(key(z, AlertKind.ART_BUFFER), AlertKind.ART_BUFFER, AlertLevel.CAUTION, title = z.name, detail = z.note)
+        return Alert(key(z, AlertKind.CAUTION_AREA), AlertKind.CAUTION_AREA, AlertLevel.CAUTION, title = z.name, detail = z.note)
     }
 
     // --- Hysteresis ------------------------------------------------------------------
