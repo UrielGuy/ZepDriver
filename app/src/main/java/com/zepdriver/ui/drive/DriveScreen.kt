@@ -36,6 +36,7 @@ import com.zepdriver.ui.map.GeoJson
 import com.zepdriver.ui.map.MapCamera
 import com.zepdriver.ui.map.MapStyle
 import com.zepdriver.ui.map.PlayaMap
+import com.zepdriver.ui.sim.SimOverlay
 import com.zepdriver.ui.theme.Zep
 
 /**
@@ -178,5 +179,14 @@ fun DriveScreen(
         }
 
         if (alarm) AlarmBorder(flashOn)
+
+        // Playa simulator pad (debug builds; nothing unless it's on): left edge, mid-height.
+        SimOverlay(
+            vm.sim,
+            Modifier
+                .align(Alignment.CenterStart)
+                .padding(contentPadding)
+                .padding(start = 20.dp),
+        )
     }
 }

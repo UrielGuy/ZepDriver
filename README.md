@@ -41,6 +41,15 @@ CI (GitHub Actions) runs both and uploads the debug APK as the
 In environments without Google's Maven repository, pass `-Pzep.skipApp=true`
 to build only `:core`.
 
+### Testing at home
+
+Debug builds (the APK CI publishes) have **Settings → Simulator**. It
+replaces GPS with a simulated car at Black Rock City: drive it with an
+on-screen pad, run a guided tour that sets off each warning in turn, or let
+it follow the active route. Optional fake fleet cars show up in the fleet
+view. Simulated positions are never sent over the mesh, but they are recorded
+in the trip log. The simulator is always off when the app starts.
+
 ## Data
 
 The app bundles one year's data in `app/src/main/assets/playa/<year>/`. To

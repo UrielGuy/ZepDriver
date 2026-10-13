@@ -11,6 +11,8 @@ import com.zepdriver.core.profile.VehicleProfile
 import com.zepdriver.core.rules.DriveState
 import com.zepdriver.core.rules.RuleSet
 import com.zepdriver.core.search.SearchIndex
+import com.zepdriver.core.sim.SimMode
+import com.zepdriver.core.sim.SimStart
 import com.zepdriver.core.trip.TripPoint
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -152,6 +154,50 @@ interface TripLog {
     suspend fun clear()
 }
 
+data class SimState(
+    /** Simulated GPS is replacing the real one. */
+    val enabled: Boolean = false,
+    val mode: SimMode = SimMode.MANUAL,
+    /** Where MANUAL / AUTOPILOT drives start (the tour has its own start). */
+    val start: SimStart = SimStart.OPEN_PLAYA,
+    /** The speed the simulated car is heading for. */
+    val targetSpeedMph: Double = 0.0,
+    /** TOUR: what the current segment shows, e.g. "Speed: 6.2 mph (warning)". */
+    val tourLabel: String? = null,
+    /** TOUR: 1-based segment number, and the number of segments. */
+    val tourStep: Int = 0,
+    val tourSteps: Int = 0,
+    /** AUTOPILOT: following a route right now. */
+    val following: Boolean = false,
+    /** Made-up vehicles (and one hello message) in the fleet view; never transmitted. */
+    val fakeFleet: Boolean = false,
+)
+
+/**
+ * Playa simulator for testing at home (debug builds only): replaces GPS with
+ * a simulated car at Black Rock City, so warnings, navigation and the trip
+ * log react as if driving on playa. Simulated positions are never sent over
+ * the mesh. Always starts disabled; nothing is persisted.
+ */
+interface SimulatorController {
+    /** False in release builds, where every call is ignored. */
+    val available: Boolean
+    val state: StateFlow<SimState>
+    fun setEnabled(enabled: Boolean)
+    fun setMode(mode: SimMode)
+    /** Moves the car to [start] and stops (MANUAL / AUTOPILOT). */
+    fun setStart(start: SimStart)
+    fun setFakeFleet(enabled: Boolean)
+    /** Changes the target speed by [deltaMph] (kept within 0..10). In TOUR mode this takes over (MANUAL). */
+    fun changeSpeed(deltaMph: Double)
+    /** Steering while a button is held: degrees per second, positive = right; 0 on release. */
+    fun steer(degPerSec: Double)
+    /** Takes over (MANUAL) and brakes to a stop. */
+    fun stop()
+    /** TOUR: jumps to the next segment. */
+    fun nextSegment()
+}
+
 /** Service locator, initialised by [ZepApp.onCreate]. */
 object AppGraph {
     lateinit var playa: PlayaRepository
@@ -159,4 +205,5 @@ object AppGraph {
     lateinit var drive: DriveController
     lateinit var mesh: MeshController
     lateinit var trips: TripLog
+    lateinit var sim: SimulatorController
 }

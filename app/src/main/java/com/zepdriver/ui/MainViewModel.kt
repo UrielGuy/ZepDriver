@@ -9,6 +9,7 @@ import com.zepdriver.DriveUiState
 import com.zepdriver.Favorite
 import com.zepdriver.MeshUiState
 import com.zepdriver.PlayaBundle
+import com.zepdriver.SimulatorController
 import com.zepdriver.TripDay
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.mesh.FleetVehicle
@@ -40,7 +41,7 @@ import java.util.UUID
 
 enum class Tab(val label: String) { DRIVE("Drive"), SEARCH("Search"), ROUTE("Route"), FAVORITES("Favorites"), FLEET("Fleet"), SETTINGS("Settings") }
 
-enum class SettingsSection(val label: String) { CAR("Car"), APP("App"), RADIO("Radio"), TRIPS("Trip log"), DATA("Data"), RULES("Rules") }
+enum class SettingsSection(val label: String) { CAR("Car"), APP("App"), RADIO("Radio"), TRIPS("Trip log"), DATA("Data"), RULES("Rules"), SIMULATOR("Simulator") }
 
 /** A request to center the map on a place; [seq] makes repeated requests distinct. */
 data class MapFocus(val position: LatLon, val seq: Long)
@@ -68,6 +69,8 @@ class MainViewModel : ViewModel() {
     val profile: StateFlow<VehicleProfile> = AppGraph.settings.profile
     val prefs: StateFlow<AppPrefs> = AppGraph.settings.prefs
     val favorites: StateFlow<List<Favorite>> = AppGraph.settings.favorites
+    /** Playa simulator (debug builds only; see [SimulatorController.available]). */
+    val sim: SimulatorController = AppGraph.sim
 
     // --- Navigation between screens --------------------------------------------
     private val _tab = MutableStateFlow(Tab.DRIVE)
