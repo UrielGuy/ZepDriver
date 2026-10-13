@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -363,4 +364,32 @@ private fun DirectionArrow(rotationDeg: Float, color: Color, modifier: Modifier 
 fun AlarmBorder(flashOn: Boolean, modifier: Modifier = Modifier) {
     val c = Zep.colors
     Box(modifier.fillMaxSize().border(16.dp, if (flashOn) c.alarmAlt else c.alarm))
+}
+
+/**
+ * Debug builds only: overrides the moving lock so everything stays usable
+ * while driving (for testing with the simulator). Amber "Unlocked" when on.
+ */
+@Composable
+fun DebugLockToggle(unlocked: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Zep.colors
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = if (unlocked) c.caution else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        contentColor = if (unlocked) Color.Black else MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.height(36.dp),
+    ) {
+        Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.Lock,
+                contentDescription = if (unlocked) "Lock the screen while moving" else "Unlock the screen while moving (debug)",
+                modifier = Modifier.size(18.dp),
+            )
+            if (unlocked) {
+                Spacer(Modifier.width(6.dp))
+                Text("Unlocked", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
 }

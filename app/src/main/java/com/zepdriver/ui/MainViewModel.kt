@@ -80,6 +80,17 @@ class MainViewModel : ViewModel() {
     /** Playa simulator (debug builds only; see [SimulatorController.available]). */
     val sim: SimulatorController = AppGraph.sim
 
+    // Debug builds: an unlock toggle that keeps the full UI usable while moving (for testing).
+    private val _debugUnlocked = MutableStateFlow(false)
+    val debugUnlocked: StateFlow<Boolean> = _debugUnlocked.asStateFlow()
+
+    fun toggleDebugUnlock() {
+        if (sim.available) _debugUnlocked.update { !it }
+    }
+
+    /** The moving lock, unless overridden in a debug build. */
+    private fun uiLocked(): Boolean = drive.value.isLocked() && !_debugUnlocked.value
+
     // --- Navigation between screens --------------------------------------------
     private val _tab = MutableStateFlow(Tab.DRIVE)
     val tab: StateFlow<Tab> = _tab.asStateFlow()
@@ -210,7 +221,7 @@ class MainViewModel : ViewModel() {
 
     // --- Screen navigation ----------------------------------------------------------------
     fun setTab(tab: Tab) {
-        if (drive.value.isLocked() && tab != Tab.DRIVE) return
+        if (uiLocked() && tab != Tab.DRIVE) return
         _tab.value = tab
     }
 
@@ -220,7 +231,7 @@ class MainViewModel : ViewModel() {
 
     /** A USB radio was plugged in: bring the radio settings forward (only when parked). */
     fun onUsbAttached() {
-        if (drive.value.isLocked()) return
+        if (uiLocked()) return
         _settingsSection.value = SettingsSection.RADIO
         _tab.value = Tab.SETTINGS
     }

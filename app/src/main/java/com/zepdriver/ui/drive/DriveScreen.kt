@@ -178,6 +178,13 @@ fun DriveScreen(
     val topAlert = drive?.alerts?.firstOrNull()
     val alarm = speedLevel == AlertLevel.ALARM || topAlert?.level == AlertLevel.ALARM
     val flashOn = rememberFlash(alarm)
+    val debugUnlocked by vm.debugUnlocked.collectAsStateWithLifecycle()
+    val statusRow: @Composable (Modifier) -> Unit = { m ->
+        Row(m, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (vm.sim.available) DebugLockToggle(unlocked = debugUnlocked, onClick = vm::toggleDebugUnlock)
+            StatusChip(fix, mesh, fleet.size, ui.routerBusy)
+        }
+    }
 
     // --- Tap-for-info popup --------------------------------------------------------------
     var tap by remember { mutableStateOf<MapTap?>(null) }
@@ -233,19 +240,15 @@ fun DriveScreen(
                     NavPanel(
                         nav = nav,
                         stops = ui.stops,
-                        canEnd = stopped || nav.finished,
+                        canEnd = stopped || nav.finished || debugUnlocked,
                         onEnd = vm::stopNavigation,
                         modifier = Modifier.fillMaxWidth(),
                         nowMillis = etaNow,
                     )
                 }
-                if (!chipBeside) {
-                    StatusChip(fix, mesh, fleet.size, ui.routerBusy, Modifier.align(Alignment.End))
-                }
+                if (!chipBeside) statusRow(Modifier.align(Alignment.End))
             }
-            if (chipBeside) {
-                StatusChip(fix, mesh, fleet.size, ui.routerBusy, Modifier.align(Alignment.TopEnd))
-            }
+            if (chipBeside) statusRow(Modifier.align(Alignment.TopEnd))
 
             val card: @Composable (Modifier) -> Unit = { m ->
                 info?.let { i ->

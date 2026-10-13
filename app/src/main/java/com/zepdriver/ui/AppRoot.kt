@@ -105,7 +105,8 @@ fun ZepRoot(vm: MainViewModel) {
 @Composable
 private fun MainScaffold(vm: MainViewModel, bundle: PlayaBundle, ui: DriveUiState) {
     val tab by vm.tab.collectAsStateWithLifecycle()
-    val locked = ui.isLocked()
+    val debugUnlocked by vm.debugUnlocked.collectAsStateWithLifecycle()
+    val locked = ui.isLocked() && !debugUnlocked
     val shown = if (locked) Tab.DRIVE else tab
     val snackbar = remember { SnackbarHostState() }
 
