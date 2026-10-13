@@ -49,11 +49,14 @@ class PlayaSimulatorTest {
             sim.setTargetSpeed(4.0)
             val states = (0 until 25).map { m.update(sim.step(1000, NOON + it * 1000L)) }
             if (start == SimStart.CENTER_CAMP) {
-                // Pointed at Center Camp through the portal (the Esplanade has a gap there):
-                // warned off the plaza before reaching it.
-                assertTrue(states.all { it.alerts.isEmpty() })
-                val more = (25 until 120).map { m.update(sim.step(1000, NOON + it * 1000L)) }
-                assertTrue(more.any { s -> s.alerts.any { it.kind == AlertKind.NO_ENTRY_APPROACH && it.title == "Center Camp Plaza ahead" } })
+                // Pointed at Center Camp: warned off the closed frontage (Rod's Road
+                // in front of Center Camp) before reaching it, never inside it.
+                val more = states + (25 until 120).map { m.update(sim.step(1000, NOON + it * 1000L)) }
+                val firstWarning = more.indexOfFirst { s ->
+                    s.alerts.any { it.kind == AlertKind.NO_ENTRY_APPROACH && it.title == "Center Camp frontage ahead" }
+                }
+                assertTrue(firstWarning >= 0, "no frontage warning")
+                assertTrue(more.take(firstWarning).all { it.alerts.isEmpty() })
             } else {
                 assertTrue(states.all { it.alerts.isEmpty() }, "$start: ${states.flatMap { it.alerts }.map { it.title }.toSet()}")
             }

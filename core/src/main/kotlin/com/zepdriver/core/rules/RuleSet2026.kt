@@ -70,6 +70,28 @@ object RuleSet2026 : RuleSet {
             )
         }
 
+        // In front of Center Camp the Esplanade gives way to Rod's Road, which bulges
+        // toward the Man (5:35–6:24); that stretch and the 6:00 road from it to the
+        // plaza are closed to vehicles entirely, not just cross-only.
+        val espOuter = esp.radiusFt + esp.widthFt / 2
+        val centerCampFront = data.streets.filter { s ->
+            val r = s.line.points.map { it.length() }
+            when {
+                s.kind == StreetKind.CENTER_CAMP -> r.all { it <= espOuter }
+                s.kind == StreetKind.AVENUE && s.name == "6:00" ->
+                    r.all { it >= esp.radiusFt - 400 && it <= layout.centerCamp.distanceFt }
+                else -> false
+            }
+        }
+        if (centerCampFront.isNotEmpty()) {
+            zones += Zone(
+                id = "center-camp-front", name = "Center Camp frontage", kind = ZoneKind.NO_ENTRY,
+                shapes = centerCampFront.map { ZoneShape.Corridor(it.line, it.widthFt / 2) },
+                spokenName = "the Center Camp frontage",
+                note = "The Esplanade in front of Center Camp and the 6:00 road into it are closed to vehicles.",
+            )
+        }
+
         val walkIn = layout.walkInCamping
         zones += Zone(
             id = "walk-in-camping", name = "Walk-in camping", kind = ZoneKind.NO_ENTRY,

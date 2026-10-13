@@ -51,6 +51,17 @@ class RuleSet2026Test {
         assertEquals(ZoneKind.CROSS_ONLY, zones["esplanade"]!!.kind)
     }
 
+    @Test fun centerCampFrontIsClosed() {
+        assertEquals(ZoneKind.NO_ENTRY, zones["center-camp-front"]!!.kind)
+        assertTrue(zones["center-camp-front"]!!.shapes.size >= 4)
+        // Rod's Road where it stands in for the Esplanade, and the 6:00 road to the plaza.
+        assertTrue(inside("center-camp-front", at("6:00", 2230.0)))
+        assertTrue(inside("center-camp-front", at("6:00", 2650.0)))
+        // The regular Esplanade and the 6:00 promenade toward the Man are unaffected.
+        assertFalse(inside("center-camp-front", at("5:00", 2500.0)))
+        assertFalse(inside("center-camp-front", at("6:00", 1500.0)))
+    }
+
     @Test fun walkInAndFence() {
         assertTrue(inside("walk-in-camping", at("3:30", 6300.0)))
         assertFalse(inside("walk-in-camping", at("7:00", 6300.0)))

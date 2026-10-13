@@ -56,7 +56,7 @@ Mode switching uses hysteresis so stop-and-go traffic doesn't flap.
 
 | Type | Meaning | 2026 zones |
 |------|---------|------------|
-| **No-entry** | May not be driven into at all | Great Circle around the Man, Center Camp plaza, walk-in camping (beyond K, 2:00–5:00), outside the trash fence |
+| **No-entry** | May not be driven into at all | Great Circle around the Man, Center Camp plaza, the Center Camp frontage (Rod's Road where it replaces the Esplanade, 5:35–6:24, and the 6:00 road from it to the plaza), walk-in camping (beyond K, 2:00–5:00), outside the trash fence |
 | **Cross-only** | May cross, may not drive along | Esplanade (its open-playa side is fine), 3/6/9/12 promenades, community paths |
 | **License-restricted** | Only some licenses | City streets for playa-only (incl. LCU) licenses: direct route camp ↔ open playa only |
 | **Sound-off** | Amplified sound must be off while active | City streets 2:00–10:00 (quiet hours); Temple burn perimeter on Temple burn night |
