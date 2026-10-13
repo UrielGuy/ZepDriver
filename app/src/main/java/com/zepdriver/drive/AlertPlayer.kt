@@ -1,0 +1,223 @@
+package com.zepdriver.drive
+
+import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
+import com.zepdriver.AppPrefs
+import com.zepdriver.core.alerts.Alert
+import com.zepdriver.core.alerts.AlertLevel
+import com.zepdriver.core.rules.DriveState
+import kotlinx.coroutines.flow.StateFlow
+import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * Turns alerts and navigation prompts into sound, voice and vibration.
+ *
+ * - CAUTION: silent.
+ * - ADVISORY: soft chime once when the alert appears, spoken once.
+ * - WARNING: three beeps + vibration when it appears, beeps again every ~8 s
+ *   while it persists; spoken once.
+ * - ALARM: siren every ~2 s while active plus vibration; speech every ~10 s.
+ *
+ * Voice priority: ALARM > WARNING > navigation > ADVISORY. Tones play even
+ * when voice is turned off in [AppPrefs]. Everything goes to the media stream
+ * with transient ducking focus so it plays through the car's speakers.
+ */
+class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
+    private val app = context.applicationContext
+    private val audio = app.getSystemService(AudioManager::class.java)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val toneExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "zep-tones") }
+    private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        app.getSystemService(VibratorManager::class.java)?.defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        app.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+    }
+
+    private val mediaAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_MEDIA)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+
+    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(mediaAttributes)
+        .setOnAudioFocusChangeListener { }
+        .build()
+    private val focusUsers = AtomicInteger(0)
+    private val abandonFocus = Runnable { if (focusUsers.get() == 0) audio?.abandonAudioFocusRequest(focusRequest) }
+
+    @Volatile private var ttsReady = false
+    private val tts: TextToSpeech = TextToSpeech(app) { status ->
+        if (status == TextToSpeech.SUCCESS) onTtsReady()
+    }
+    private var utteranceSeq = 0
+
+    // Per-alert bookkeeping (accessed only from the caller's thread).
+    private class Seen(var level: AlertLevel, var lastSound: Long, var lastSpeech: Long)
+    private val seen = HashMap<String, Seen>()
+    private var lastAlarmSound = 0L
+    private var lastChime = 0L
+    private var lastNavSpeech: String? = null
+    private var lastNavSpeechAt = 0L
+
+    private class Utterance(val priority: Int, val text: String)
+
+    private fun onTtsReady() {
+        tts.setLanguage(Locale.US)
+        tts.setAudioAttributes(mediaAttributes)
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) = releaseFocus()
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) = releaseFocus()
+            override fun onError(utteranceId: String?, errorCode: Int) = releaseFocus()
+            override fun onStop(utteranceId: String?, interrupted: Boolean) = releaseFocus()
+        })
+        ttsReady = true
+    }
+
+    /** Call once per drive update with the new state and the navigation prompt, if any. */
+    fun update(state: DriveState, navSpeech: String?, now: Long = System.currentTimeMillis()) {
+        val speech = ArrayList<Utterance>()
+        val active = state.alerts.associateBy { it.key }
+        seen.keys.retainAll(active.keys)
+
+        var playSiren = false
+        var playBeeps = false
+        var playChime = false
+        var vibration: LongArray? = null
+
+        for (alert in state.alerts) {
+            val prev = seen[alert.key]
+            val isNew = prev == null || alert.level > prev.level
+            val s = prev ?: Seen(alert.level, 0L, 0L).also { seen[alert.key] = it }
+            s.level = alert.level
+            when (alert.level) {
+                AlertLevel.ALARM -> {
+                    if (isNew || now - s.lastSpeech >= ALARM_SPEECH_MS) {
+                        alert.speechOrTitle()?.let { speech += Utterance(4, it) }
+                        s.lastSpeech = now
+                    }
+                    if (isNew || now - lastAlarmSound >= ALARM_REPEAT_MS) {
+                        playSiren = true
+                        vibration = ALARM_VIBRATION
+                    }
+                }
+                AlertLevel.WARNING -> {
+                    if (isNew) {
+                        alert.speechOrTitle()?.let { speech += Utterance(3, it) }
+                        s.lastSpeech = now
+                    }
+                    if (isNew || now - s.lastSound >= WARNING_REPEAT_MS) {
+                        playBeeps = true
+                        s.lastSound = now
+                        if (vibration == null) vibration = WARNING_VIBRATION
+                    }
+                }
+                AlertLevel.ADVISORY -> if (isNew) {
+                    alert.speech?.let { speech += Utterance(1, it) }
+                    playChime = true
+                }
+                AlertLevel.CAUTION, AlertLevel.NONE -> Unit
+            }
+        }
+        if (!navSpeech.isNullOrBlank() && (navSpeech != lastNavSpeech || now - lastNavSpeechAt > 5_000)) {
+            speech += Utterance(2, navSpeech)
+            lastNavSpeech = navSpeech
+            lastNavSpeechAt = now
+        }
+
+        // One sound per update: the most severe wins.
+        when {
+            playSiren -> { lastAlarmSound = now; playTone(Tones.siren) }
+            playBeeps -> playTone(Tones.beeps)
+            playChime && now - lastChime > 2_000 -> { lastChime = now; playTone(Tones.chime) }
+        }
+        vibration?.let { vibrate(it) }
+        speak(speech)
+    }
+
+    private fun Alert.speechOrTitle(): String? = speech ?: title.takeIf { it.isNotBlank() }
+
+    private fun speak(utterances: List<Utterance>) {
+        if (utterances.isEmpty() || !ttsReady || !prefs.value.voiceEnabled) return
+        val ordered = utterances.sortedByDescending { it.priority }
+        val urgent = ordered.first().priority >= 3
+        for ((i, u) in ordered.take(3).withIndex()) {
+            // Advisories are dropped rather than queued behind something more important.
+            if (u.priority <= 1 && (urgent || tts.isSpeaking)) continue
+            val mode = if (i == 0 && u.priority >= 4) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            acquireFocus()
+            val result = tts.speak(u.text, mode, null, "zep-${utteranceSeq++}")
+            if (result != TextToSpeech.SUCCESS) releaseFocus()
+        }
+    }
+
+    private fun playTone(samples: ShortArray) {
+        acquireFocus()
+        toneExecutor.execute {
+            try {
+                Tones.play(samples)
+            } finally {
+                releaseFocus()
+            }
+        }
+    }
+
+    private fun vibrate(pattern: LongArray) {
+        val v = vibrator ?: return
+        try {
+            if (v.hasVibrator()) v.vibrate(VibrationEffect.createWaveform(pattern, -1))
+        } catch (e: Exception) {
+            Log.w(TAG, "vibration failed", e)
+        }
+    }
+
+    private fun acquireFocus() {
+        mainHandler.removeCallbacks(abandonFocus)
+        if (focusUsers.getAndIncrement() == 0) {
+            audio?.requestAudioFocus(focusRequest)
+        }
+    }
+
+    private fun releaseFocus() {
+        if (focusUsers.decrementAndGet() <= 0) {
+            focusUsers.set(0)
+            mainHandler.postDelayed(abandonFocus, 700)
+        }
+    }
+
+    fun release() {
+        toneExecutor.shutdownNow()
+        try {
+            tts.stop()
+            tts.shutdown()
+        } catch (e: Exception) {
+            Log.w(TAG, "tts shutdown failed", e)
+        }
+        mainHandler.removeCallbacks(abandonFocus)
+        audio?.abandonAudioFocusRequest(focusRequest)
+    }
+
+    private companion object {
+        const val TAG = "AlertPlayer"
+        const val ALARM_REPEAT_MS = 2_000L
+        const val ALARM_SPEECH_MS = 10_000L
+        const val WARNING_REPEAT_MS = 8_000L
+        val WARNING_VIBRATION = longArrayOf(0, 180, 120, 180, 120, 180)
+        val ALARM_VIBRATION = longArrayOf(0, 500, 150, 500, 150, 500)
+    }
+}
