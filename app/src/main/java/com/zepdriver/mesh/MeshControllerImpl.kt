@@ -9,7 +9,8 @@ import com.zepdriver.MeshUiState
 import com.zepdriver.SettingsStore
 import com.zepdriver.core.flash.EspFlasher
 import com.zepdriver.core.flash.FirmwareCatalog
-import com.zepdriver.core.flash.FlashImage
+import com.zepdriver.core.flash.FlashOptions
+import com.zepdriver.core.flash.ResetMode
 import com.zepdriver.core.geo.Fix
 import com.zepdriver.core.mesh.FleetVehicle
 import com.zepdriver.core.mesh.MeshEvent
@@ -238,7 +239,7 @@ class MeshControllerImpl(
     }
 
     private fun linkReady(deviceName: String?) {
-        protocol = MeshProtocol()
+        protocol = MeshProtocol().also { it.carName = carName() }
         myNode = null
         if (deviceName != null) _state.update { it.copy(deviceName = deviceName) }
         bleConn = MeshConnection.CONNECTING
@@ -380,7 +381,10 @@ class MeshControllerImpl(
                 _state.update { it.copy(flashProgress = 0f) }
                 val port = usb.open(driver, 115_200)
                 try {
-                    EspFlasher(port) { log(it) }.flash(listOf(FlashImage(0, image))) { p ->
+                    val options = FlashOptions(
+                        resetMode = if (driver.device.vendorId == ESPRESSIF_VID) ResetMode.USB_JTAG_SERIAL else ResetMode.CLASSIC,
+                    )
+                    EspFlasher(port, log = { log(it) }, options = options).flash(FirmwareCatalog.flashImages(image)) { p ->
                         _state.update { it.copy(flashProgress = p.coerceIn(0f, 1f)) }
                     }
                 } finally {
@@ -435,10 +439,10 @@ class MeshControllerImpl(
             // Both low: run mode (no reset / bootloader) on CP210x and ESP32-S3 native USB.
             port.setDtr(false)
             port.setRts(false)
-            val proto = MeshProtocol()
+            val proto = MeshProtocol().also { it.carName = name }
             val deframer = StreamFraming.Deframer()
             // Wake the serial API (it starts in debug-text mode), then ask for the config.
-            port.write(ByteArray(32) { 0xC3.toByte() })
+            port.write(StreamFraming.WAKE)
             delay(100)
             port.write(StreamFraming.frame(proto.wantConfig()))
 
@@ -590,5 +594,6 @@ class MeshControllerImpl(
         const val MAX_MESSAGES = 200
         const val MAX_LOG = 200
         const val MAX_TEXT_BYTES = 200
+        const val ESPRESSIF_VID = 0x303A
     }
 }
