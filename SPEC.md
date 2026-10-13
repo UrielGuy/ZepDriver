@@ -194,8 +194,10 @@ and routing:
 - The shared key is not a secret (anyone can extract it from the APK),
   so mesh traffic should be treated as public to anyone determined.
 - Modem preset MEDIUM_FAST, hop limit 3, to keep airtime low with many cars.
-- The Meshtastic firmware (GPL-3) is downloaded from Meshtastic's releases
-  and cached; it isn't bundled in the APK. The app talks to the radio with a
+- The Meshtastic firmware image for the Heltec V3 (GPL-3) is bundled in the
+  APK at build time (fetched from Meshtastic's releases by Gradle), so
+  flashing works offline. The app shows the GPL notice and a link to the
+  exact firmware source; if the bundled image is missing it downloads it. The app talks to the radio with a
   small hand-written protobuf codec rather than the GPL `.proto` files.
 - Position broadcast interval adapts to motion (more often when moving,
   rarely when parked) to stay within LoRa airtime limits.

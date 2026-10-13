@@ -65,7 +65,7 @@ ruleset, then rebuild the data bundle for the new year (SPEC.md §13).
 
 - **Board:** Heltec WiFi LoRa 32 V3, US 915 MHz version, about $20 on Amazon.
 - **Setup:** plug it into the phone with a USB-C OTG cable, then go to
-  Settings → Radio → *Flash & set up USB radio*. You'll need internet once,
-  to download the Meshtastic firmware.
+  Settings → Radio → *Flash & set up USB radio*. The Meshtastic firmware
+  ships inside the app, so this works offline.
 - **Antenna:** use a better one than the stock antenna, mounted high on the
   car.
