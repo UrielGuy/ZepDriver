@@ -125,7 +125,7 @@ object MapPalettes {
  * GeoJsonSource.setGeoJson after the style loads.
  */
 object MapStyle {
-    const val FONT = "Open Sans Regular"
+    const val FONT = "OpenSans-Regular"
 
     const val SRC_ZONES = "zones"
     const val SRC_ART = "art"
