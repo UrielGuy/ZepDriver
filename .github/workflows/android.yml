@@ -30,6 +30,7 @@ jobs:
         # LJSpeech); clips are bundled so warnings speak even without an
         # offline text-to-speech voice on the phone.
         run: |
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg; }
           ./gradlew :core:speechCatalog
           mkdir -p build/tts
           curl -sSfL --retry 3 -o build/tts/piper.tgz https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz
