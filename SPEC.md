@@ -4,7 +4,9 @@ An Android app for Burning Man Mutant Vehicle (art car) drivers: speed and
 zone compliance, offline maps and search, navigation, and a fleet mesh so
 every car running the app can see the others.
 
-V1 targets **Black Rock City 2027**. Development uses the public 2026 data.
+V1 targets **Black Rock City 2027**. Until 2027 data exists, the app ships with
+the 2026 data (official GIS layers + the Public API snapshot) and the coded 2026
+ruleset.
 
 ---
 
@@ -52,15 +54,18 @@ Mode switching uses hysteresis so stop-and-go traffic doesn't flap.
 
 ### 4.1 Zone types (coded per year)
 
-| Type | Meaning | Examples |
-|------|---------|----------|
-| **No-entry area** | May not be driven into at all | Man base / burn perimeter, Center Camp area, Temple area, outside the trash fence |
-| **Cross-only road** | May cross it, may not drive along it | Esplanade, promenades / keyhole roads, other restricted roads per that year's DMV rules |
-| **Time-bound zone** | Active only during set times | Burn-night perimeters, quiet hours |
-| **License-restricted** | Depends on the driver's license profile | City streets for playa-only licenses |
+| Type | Meaning | 2026 zones |
+|------|---------|------------|
+| **No-entry** | May not be driven into at all | Great Circle around the Man, Center Camp plaza, walk-in camping (beyond K, 2:00–5:00), outside the trash fence |
+| **Cross-only** | May cross, may not drive along | Esplanade (its open-playa side is fine), 3/6/9/12 promenades, community paths |
+| **License-restricted** | Only some licenses | City streets for playa-only (incl. LCU) licenses: direct route camp ↔ open playa only |
+| **Sound-off** | Amplified sound must be off while active | City streets 2:00–10:00 (quiet hours); Temple burn perimeter on Temple burn night |
+| **Caution** | Reminder only | Plazas; Man burn perimeter on burn night |
 
-Exact zone membership comes from the current year's DMV rules, verified
-before each burn. Geometry comes from the Burning Man GIS data.
+Rules live in code (`core/.../rules/RuleSet2026.kt`) with their sources.
+Items not quoted directly from DMV documents are marked `VERIFY` there and
+must be checked in the annual review (§13). Geometry comes from the Burning
+Man GIS data.
 
 ### 4.2 Warning levels
 
@@ -76,10 +81,19 @@ few seconds), so a normal perpendicular crossing never alarms.
 
 ### 4.3 Vehicle and license profile (preferences)
 
-Set once in Parked mode, used by warnings and routing:
+Every car configures its own license once, in Parked mode. Used by warnings
+and routing:
 
-- License type: day / night, full city / playa-only, any other
-  license limitations
+- License class:
+  - **Mutant Vehicle**: city streets and open playa
+  - **Mutant Vehicle, playa only** (includes large / LCU vehicles): city only
+    on the direct route between home camp and the open playa
+  - **Accessibility Vehicle**: may drive city streets; the participant with
+    the disability must be aboard; max 20 ft × 7 ft; same pedestrian-area
+    restrictions; not subject to the MV sound policy
+- License hours: day / night / both (warns when driving outside them,
+  using sunrise/sunset at BRC)
+- Has a sound system (enables sound-policy reminders)
 - Home camp (BRC address)
 - Vehicle length and width
 - Where the phone is mounted on the vehicle (offset from the front), so
@@ -107,10 +121,11 @@ Set once in Parked mode, used by warnings and routing:
 
 ### 6.2 Updates
 
-- The app checks a project-hosted manifest whenever a connection exists
-  and downloads newer bundles in the background (WorkManager). Data is
+- The app checks a project-hosted manifest (in this repo) whenever a
+  connection exists and downloads newer bundles in the background
+  (WorkManager). Each file is verified against the manifest's SHA-256 and
   swapped in atomically; the last good bundle is kept as a fallback.
-- Bundles are signed so the app only accepts project-published data.
+- Bundle signing is a later improvement; V1 relies on HTTPS + checksums.
 
 ### 6.3 Search and favorites
 
@@ -178,13 +193,21 @@ Set once in Parked mode, used by warnings and routing:
   public channel to avoid playa congestion.
 - The shared key is not a secret (anyone can extract it from the APK),
   so mesh traffic should be treated as public to anyone determined.
+- Modem preset MEDIUM_FAST, hop limit 3, to keep airtime low with many cars.
+- The Meshtastic firmware (GPL-3) is downloaded from Meshtastic's releases
+  and cached; it isn't bundled in the APK. The app talks to the radio with a
+  small hand-written protobuf codec rather than the GPL `.proto` files.
 - Position broadcast interval adapts to motion (more often when moving,
   rarely when parked) to stay within LoRa airtime limits.
 
 ### 10.4 Features
 
+- **Car name required:** the first connection to a radio asks for the car
+  name; the app won't connect until one is set. It becomes the node's
+  owner name, which other cars see.
 - Show every app vehicle on the map with its name and time last seen.
 - Short text messages between app instances (composed in Parked mode).
+- Only current positions are shared. Trails are never sent over the mesh.
 
 ---
 
@@ -194,12 +217,15 @@ Set once in Parked mode, used by warnings and routing:
 - Export as **KML** (opens in Google Earth, importable into Google My Maps)
   and **GPX**, via the Android share sheet.
 - Stored on the device only; deletable.
+- **Own trail on the map:** optionally show our own car's path over the
+  last N hours or days (configurable window). Drawn from the local log only.
 
 ---
 
 ## 12. Out of scope for V1
 
 - Events / schedules
+- Sharing trails over the mesh
 - Choosing a different year's map
 - Peer-to-peer data sharing between phones
 
@@ -221,8 +247,11 @@ Set once in Parked mode, used by warnings and routing:
 ## 14. Tech stack
 
 - Kotlin, Jetpack Compose, Android min SDK 26
-- MapLibre Native Android (offline vector tiles, 3D extrusions)
-- Room / SQLite FTS for search
+- `:core`: pure-Kotlin module with all domain logic (rules, geometry,
+  routing, BRC addresses, search, mesh protocol, flasher, exports), unit
+  tested against the real data
+- MapLibre Native Android (offline GeoJSON layers, 3D extrusions)
+- In-memory search index; SQLite for the trip log
 - Foreground service for location, warnings, mesh and logging
 - WorkManager for data updates
 - Meshtastic protobufs over BLE; `usb-serial-for-android` for flashing
