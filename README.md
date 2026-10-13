@@ -20,6 +20,14 @@ An Android app for Burning Man Mutant Vehicle (art car) drivers:
 
 See [SPEC.md](SPEC.md) for the full product spec.
 
+## Install (testers)
+
+On your Android phone, open
+**https://github.com/UrielGuy/ZepDriver/releases/download/latest-debug/zepdriver-debug.apk**
+and install it. If Android asks, allow installing apps from your browser.
+That link always points at the newest build, and each new build installs as
+an update that keeps your settings.
+
 ## Building
 
 ```sh
@@ -49,7 +57,7 @@ python3 tools/data/build_playa_data.py \
 ```
 
 Installed apps pick up a new bundle automatically: when they have internet,
-they check `manifest.json` on the `main` branch of this repo.
+they check `manifest.json` on this repo's default branch.
 
 Data is subject to the
 [Terms of Service for Burning Man APIs and Datasets](https://innovate.burningman.org/terms-of-service-for-burning-man-apis-and-datasets/).

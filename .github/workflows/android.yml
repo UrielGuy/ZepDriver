@@ -5,6 +5,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,6 +32,20 @@ jobs:
         with:
           name: zepdriver-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - name: Publish install link (latest-debug pre-release)
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk zepdriver-debug.apk
+          gh release delete latest-debug --yes --cleanup-tag || true
+          gh release create latest-debug zepdriver-debug.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "ZepDriver — latest test build (#${GITHUB_RUN_NUMBER})" \
+            --notes "Debug build ${GITHUB_RUN_NUMBER} from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}.
+
+          On your Android phone, tap **zepdriver-debug.apk** below to download, then open it to install (allow installing from your browser if asked). Newer builds install over older ones and keep your settings."
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4

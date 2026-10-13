@@ -20,17 +20,34 @@ android {
         applicationId = "com.zepdriver"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI run number keeps every build installable as an update of the last one.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "0.1.$build"
         // Where the app looks for newer data bundles when it has internet.
         buildConfigField(
             "String", "DATA_BASE_URL",
-            "\"https://raw.githubusercontent.com/UrielGuy/ZepDriver/main/app/src/main/assets/playa/\"",
+            "\"https://raw.githubusercontent.com/UrielGuy/ZepDriver/HEAD/app/src/main/assets/playa/\"",
         )
         buildConfigField("int", "DATA_YEAR", "2026")
     }
 
+    signingConfigs {
+        // A shared debug key, committed on purpose: CI builds then install as
+        // updates over each other instead of needing an uninstall each time.
+        // Not for release builds.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }
