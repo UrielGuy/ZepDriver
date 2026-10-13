@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A stylized flame over the playa horizon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFF8A1F"
+        android:pathData="M54,26 C62,38 70,44 68,58 C66,70 58,76 54,76 C50,76 42,70 40,58 C38,46 48,40 54,26 Z" />
+    <path android:fillColor="#FFFFD34D"
+        android:pathData="M54,46 C58,52 62,56 61,63 C60,69 57,72 54,72 C51,72 48,69 47,63 C46,57 50,52 54,46 Z" />
+    <path android:fillColor="#FFD9B98C"
+        android:pathData="M24,80 L84,80 L84,84 L24,84 Z" />
+</vector>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Silicon Labs CP210x (Heltec WiFi LoRa 32 V3) -->
+    <usb-device vendor-id="4292" product-id="60000" />
+    <!-- Espressif native USB serial/JTAG (ESP32-S3 boards without a bridge) -->
+    <usb-device vendor-id="12346" product-id="4097" />
+    <!-- WCH CH340 / CH9102 (LilyGO and other boards) -->
+    <usb-device vendor-id="6790" product-id="29987" />
+    <usb-device vendor-id="6790" product-id="21972" />
+</resources>

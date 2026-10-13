@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ZepDriver" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF1A1410</item>
+        <item name="android:statusBarColor">#FF1A1410</item>
+    </style>
+</resources>
