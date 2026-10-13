@@ -7,6 +7,7 @@ import com.zepdriver.core.alerts.AlertLevel
 import com.zepdriver.core.brc.BrcAddressing
 import com.zepdriver.core.data.PlayaData
 import com.zepdriver.core.geo.Fix
+import com.zepdriver.core.profile.LicenseClass
 import com.zepdriver.core.profile.LicenseHours
 import com.zepdriver.core.profile.VehicleProfile
 import com.zepdriver.core.sun.SunTimes
@@ -40,7 +41,7 @@ class DriveMonitor(
     profile: VehicleProfile,
 ) {
     private val zones = ZoneMonitor(data, ruleSet.zones(data), profile)
-    private val speed = SpeedMonitor()
+    private val speed = SpeedMonitor(thresholdsFor(profile))
     private val modes = DrivingModeDetector()
     private val heading = HeadingEstimator()
     private val sun = SunTimes.forCity(data)
@@ -50,6 +51,7 @@ class DriveMonitor(
         set(value) {
             field = value
             zones.profile = value
+            speed.setThresholds(thresholdsFor(value))
         }
 
     /** [navigating] keeps the mode at MOVING while a route is active. */
@@ -83,7 +85,7 @@ class DriveMonitor(
     }
 
     private fun licenseHoursAlert(mode: DrivingMode, isNight: Boolean): Alert? {
-        if (mode != DrivingMode.MOVING) return null
+        if (mode != DrivingMode.MOVING || profile.licenseClass == LicenseClass.BIKE) return null
         return when {
             profile.licenseHours == LicenseHours.DAY && isNight -> Alert(
                 HOURS_KEY, AlertKind.LICENSE_HOURS, AlertLevel.WARNING, "Day license: no driving at night",
@@ -103,4 +105,8 @@ class DriveMonitor(
         const val GPS_KEY = "gps"
         const val HOURS_KEY = "license:hours"
     }
+}
+
+private fun thresholdsFor(profile: VehicleProfile): SpeedThresholds = profile.effectiveSpeedLimits.let {
+    SpeedThresholds(caution = it.cautionMph, warning = it.warningMph, alarm = it.alarmMph)
 }

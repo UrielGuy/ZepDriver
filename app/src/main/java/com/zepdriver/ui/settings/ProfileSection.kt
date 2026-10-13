@@ -19,12 +19,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zepdriver.DriveUiState
 import com.zepdriver.core.profile.LicenseClass
 import com.zepdriver.core.profile.LicenseHours
+import com.zepdriver.core.profile.SpeedLimits
 import com.zepdriver.core.profile.VehicleProfile
 import com.zepdriver.ui.MainViewModel
 import com.zepdriver.ui.common.DestinationPickerDialog
@@ -36,6 +38,8 @@ private fun LicenseClass.explanation(): String = when (this) {
         "Open playa only. In the city, just the direct route between your camp and the playa, no turning or cruising."
     LicenseClass.ACCESSIBILITY_VEHICLE ->
         "Transport for a participant with a mobility disability; may use city streets. Not subject to the MV sound policy."
+    LicenseClass.BIKE ->
+        "No license. May ride the Esplanade, promenades and paths; still kept out of walk-in camping and the Center Camp plaza. Higher speed warnings."
 }
 
 /** Car profile: name, license, size, phone position, art distance, home camp. Saved as you edit. */
@@ -70,7 +74,7 @@ internal fun ProfileSection(vm: MainViewModel, ui: DriveUiState) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        SectionTitle("License")
+        SectionTitle("Vehicle type and license")
         for (c in LicenseClass.entries) {
             RadioRow(
                 title = c.label,
@@ -83,14 +87,18 @@ internal fun ProfileSection(vm: MainViewModel, ui: DriveUiState) {
             AccessibilityNotes(profile)
         }
 
-        SectionTitle("License hours")
-        for (h in LicenseHours.entries) {
-            RadioRow(
-                title = h.label,
-                selected = profile.licenseHours == h,
-                onClick = { save { p -> p.copy(licenseHours = h) } },
-            )
+        if (profile.licenseClass != LicenseClass.BIKE) {
+            SectionTitle("License hours")
+            for (h in LicenseHours.entries) {
+                RadioRow(
+                    title = h.label,
+                    selected = profile.licenseHours == h,
+                    onClick = { save { p -> p.copy(licenseHours = h) } },
+                )
+            }
         }
+
+        SpeedWarnings(profile, save = ::save)
 
         SectionTitle("Vehicle")
         SwitchRow(
@@ -204,3 +212,50 @@ private fun AccessibilityNotes(profile: VehicleProfile) {
         }
     }
 }
+
+/** The three speed thresholds, 0.5 mph steps, never above 10 mph. */
+@Composable
+private fun SpeedWarnings(profile: VehicleProfile, save: ((VehicleProfile) -> VehicleProfile) -> Unit) {
+    val limits = profile.effectiveSpeedLimits
+    val defaults = SpeedLimits.defaultsFor(profile.licenseClass)
+    fun set(update: (SpeedLimits) -> SpeedLimits) = save { p -> p.copy(speedLimits = update(p.effectiveSpeedLimits).sanitized()) }
+
+    SectionTitle("Speed warnings")
+    SpeedStepper("Amber (no sound)", limits.cautionMph) { v -> set { it.copy(cautionMph = v) } }
+    SpeedStepper("Loud warning", limits.warningMph) { v -> set { it.copy(warningMph = v) } }
+    SpeedStepper("Alarm", limits.alarmMph) { v -> set { it.copy(alarmMph = v) } }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "Defaults for ${profile.licenseClass.label}: " +
+                "${fmt(defaults.cautionMph)} / ${fmt(defaults.warningMph)} / ${fmt(defaults.alarmMph)} mph. Max ${fmt(SpeedLimits.MAX_MPH)} mph.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (profile.speedLimits != null && limits != defaults) {
+            TextButton(onClick = { save { p -> p.copy(speedLimits = null) } }) { Text("Reset") }
+        }
+    }
+}
+
+@Composable
+private fun SpeedStepper(label: String, mph: Double, onChange: (Double) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        OutlinedButton(
+            onClick = { onChange((mph - 0.5).coerceAtLeast(SpeedLimits.MIN_MPH)) },
+            enabled = mph > SpeedLimits.MIN_MPH,
+        ) { Text("−") }
+        Text(
+            "${fmt(mph)} mph",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        OutlinedButton(
+            onClick = { onChange((mph + 0.5).coerceAtMost(SpeedLimits.MAX_MPH)) },
+            enabled = mph < SpeedLimits.MAX_MPH,
+        ) { Text("+") }
+    }
+}
+
+private fun fmt(mph: Double): String = if (mph % 1.0 == 0.0) mph.toInt().toString() else "%.1f".format(java.util.Locale.US, mph)

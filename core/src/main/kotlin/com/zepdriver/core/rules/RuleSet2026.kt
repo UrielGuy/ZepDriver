@@ -204,7 +204,16 @@ object RuleSet2026 : RuleSet {
             spokenName = "the burn perimeter",
             note = "Burn night: follow Rangers, park at the perimeter.",
         )
-        return zones
+        // Bikes may ride the Esplanade, promenades, paths and the Great Circle; only these
+        // still apply to them. VERIFY against the year's bike rules.
+        val bikeZones = setOf("trash-fence", "walk-in-camping", "center-camp")
+        return zones.map { z ->
+            if (z.id in bikeZones) z else Zone(
+                z.id, z.name, z.kind, z.shapes,
+                appliesTo = { p -> p.licenseClass != LicenseClass.BIKE && z.appliesTo(p) },
+                activeAt = z.activeAt, spokenName = z.spokenName, note = z.note,
+            )
+        }
     }
 
     /** 18:00 on [date] until 04:00 the next morning, local time. */

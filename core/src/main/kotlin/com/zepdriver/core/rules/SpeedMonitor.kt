@@ -27,9 +27,11 @@ data class SpeedThresholds(
  * CAUTION / WARNING / ALARM with dwell time and hysteresis.
  */
 class SpeedMonitor(
-    val thresholds: SpeedThresholds = SpeedThresholds(),
+    thresholds: SpeedThresholds = SpeedThresholds(),
     private val windowMillis: Long = 2_500,
 ) {
+    var thresholds: SpeedThresholds = thresholds
+        private set
     private class Gate(val level: AlertLevel, val threshold: Double) {
         var active = false
         var since: Long? = null
@@ -39,10 +41,20 @@ class SpeedMonitor(
     private val samples = ArrayDeque<Pair<Long, Double>>()
     /** (time, position) history within the window, for deriving speed when there is no Doppler. */
     private val positions = ArrayDeque<Pair<Long, LatLon>>()
-    private val gates = listOf(
-        Gate(AlertLevel.CAUTION, thresholds.caution),
-        Gate(AlertLevel.WARNING, thresholds.warning),
-        Gate(AlertLevel.ALARM, thresholds.alarm),
+    private var gates = gatesFor(thresholds)
+
+    /** Switches thresholds (e.g. the driver changed them); levels re-arm from scratch. */
+    fun setThresholds(t: SpeedThresholds) {
+        if (t == thresholds) return
+        thresholds = t
+        gates = gatesFor(t)
+        level = AlertLevel.NONE
+    }
+
+    private fun gatesFor(t: SpeedThresholds) = listOf(
+        Gate(AlertLevel.CAUTION, t.caution),
+        Gate(AlertLevel.WARNING, t.warning),
+        Gate(AlertLevel.ALARM, t.alarm),
     )
     private var projection: LocalProjection? = null
     private var lastTime: Long? = null
@@ -109,7 +121,7 @@ class SpeedMonitor(
 
     /** The speed alert for the current level, or null at NONE. */
     fun alert(): Alert? {
-        val detail = String.format(Locale.US, "%.1f mph — limit is 5 mph", speedMph)
+        val detail = String.format(Locale.US, "%.1f mph — warning at %.1f mph", speedMph, thresholds.warning)
         return when (level) {
             AlertLevel.NONE, AlertLevel.ADVISORY -> null
             AlertLevel.CAUTION -> Alert(KEY, AlertKind.SPEED, AlertLevel.CAUTION, "Near the speed limit", detail)

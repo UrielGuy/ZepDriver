@@ -43,11 +43,16 @@ Mode switching uses hysteresis so stop-and-go traffic doesn't flap.
   (`Location.getSpeed()`), smoothed over a short window.
 - Escalation (speed limit is 5 mph; thresholds include GPS tolerance):
 
-| Speed | Level | Output |
+| Speed (art car defaults) | Level | Output |
 |-------|-------|--------|
 | ≥ 5.5 mph | Caution | Speedometer turns amber |
-| ≥ 6.0 mph | Warning | Red + tone + vibration + voice "Slow down" |
-| ≥ 6.5 mph | Alarm | Flashing red, loud repeating alarm, voice |
+| ≥ 6.0 mph | Warning | Red + loud siren + vibration + voice "Slow down" |
+| ≥ 6.5 mph | Alarm | Flashing red, loud repeating siren, voice |
+
+- The three thresholds are configurable per car (Settings → Car), in
+  0.5 mph steps, never above 10 mph. Defaults depend on the vehicle type:
+  5.5 / 6 / 6.5 mph for mutant and accessibility vehicles, 8 / 9 / 10 mph
+  for bikes.
 
 - Each level needs a short dwell time to trigger and to clear (hysteresis).
 - Audio can be routed to the vehicle sound system (Bluetooth / aux).

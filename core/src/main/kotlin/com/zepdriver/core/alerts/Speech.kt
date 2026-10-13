@@ -16,7 +16,7 @@ import com.zepdriver.core.rules.ZoneShape
  */
 object Speech {
     const val SLOW_DOWN = "Slow down"
-    const val SLOW_DOWN_ALARM = "Slow down! Five miles an hour."
+    const val SLOW_DOWN_ALARM = "Slow down now!"
     const val DAY_LICENSE = "Day license. No driving at night."
     const val NIGHT_LICENSE = "Night license. No driving in daylight."
     const val DIRECT_ROUTE_ONLY = "Direct route to camp only."

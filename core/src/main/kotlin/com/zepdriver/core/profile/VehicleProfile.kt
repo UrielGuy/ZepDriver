@@ -22,6 +22,43 @@ enum class LicenseClass(val label: String) {
      * aboard. Same pedestrian-area restrictions; not subject to MV sound policy.
      */
     ACCESSIBILITY_VEHICLE("Accessibility Vehicle"),
+
+    /**
+     * A bicycle (no DMV license). May ride the Esplanade, promenades, paths
+     * and the Great Circle; still kept out of walk-in camping, the Center Camp
+     * plaza and beyond the fence. Its own, higher speed thresholds.
+     */
+    BIKE("Bike"),
+}
+
+/** Speeds (mph) at which the speed warnings start. */
+@Serializable
+data class SpeedLimits(
+    /** Amber speedometer, no sound. */
+    val cautionMph: Double,
+    /** Loud warning: siren + voice. */
+    val warningMph: Double,
+    /** Alarm: repeating siren, flashing screen. */
+    val alarmMph: Double,
+) {
+    /** Clamped to [MIN_MPH]..[MAX_MPH] and kept in order caution ≤ warning ≤ alarm. */
+    fun sanitized(): SpeedLimits {
+        val c = cautionMph.coerceIn(MIN_MPH, MAX_MPH)
+        val w = warningMph.coerceIn(c, MAX_MPH)
+        val a = alarmMph.coerceIn(w, MAX_MPH)
+        return SpeedLimits(c, w, a)
+    }
+
+    companion object {
+        /** No threshold is ever above 10 mph. */
+        const val MAX_MPH = 10.0
+        const val MIN_MPH = 2.0
+
+        fun defaultsFor(license: LicenseClass): SpeedLimits = when (license) {
+            LicenseClass.BIKE -> SpeedLimits(8.0, 9.0, 10.0)
+            else -> SpeedLimits(5.5, 6.0, 6.5)
+        }
+    }
 }
 
 /** Which hours the license is valid for. */
@@ -47,7 +84,13 @@ data class VehicleProfile(
     val artBufferFt: Double = DEFAULT_ART_BUFFER_FT,
     val homeCamp: LatLon? = null,
     val homeCampLabel: String? = null,
+    /** Custom speed thresholds; null uses [SpeedLimits.defaultsFor] the license class. */
+    val speedLimits: SpeedLimits? = null,
 ) {
+    /** The thresholds in effect: custom ones if set, else this class's defaults. */
+    val effectiveSpeedLimits: SpeedLimits
+        get() = (speedLimits ?: SpeedLimits.defaultsFor(licenseClass)).sanitized()
+
     companion object {
         const val DEFAULT_ART_BUFFER_FT = 80.0
         /** Accessibility Vehicles may not exceed this size (DMV criteria). */

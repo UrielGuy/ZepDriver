@@ -88,6 +88,7 @@ fun PlayaMap(
     val mapView = remember {
         MapLibre.getInstance(context.applicationContext)
         MapView(context).also { view ->
+            controller.viewHeightPx = { view.height }
             view.onCreate(null)
             view.getMapAsync { map -> controller.onMapReady(map) }
         }
@@ -165,6 +166,8 @@ private class PlayaMapController(private val density: Float) {
     private var pendingCamera: CameraPosition? = null
     private var released = false
     var onUserGesture: () -> Unit = {}
+    /** The map view's height in pixels (for the follow camera's offset). */
+    var viewHeightPx: () -> Int = { 0 }
     var onTap: (MapTap) -> Unit = {}
     var onLongPress: (LatLon) -> Boolean = { false }
     var myPosition: LatLon? = null
@@ -274,6 +277,8 @@ private class PlayaMapController(private val density: Float) {
             .zoom(17.0)
             .bearing(fix.bearingDeg ?: current?.bearing ?: 0.0)
             .tilt(pitchDeg.coerceIn(0.0, 60.0))
+            // The car sits ~70% down the screen so more of the route ahead shows.
+            .padding(0.0, (viewHeightPx() * FOLLOW_TOP_PADDING).toDouble(), 0.0, 0.0)
             .build()
         // The drawn car is smoothed per frame, so frequent calls just track it exactly;
         // a lone update (first fix, resuming follow) eases in.
@@ -294,6 +299,7 @@ private class PlayaMapController(private val density: Float) {
             .zoom(if (wide) 13.6 else 15.5)
             .bearing(bearing)
             .tilt(pitchDeg.coerceIn(0.0, 35.0))
+            .padding(0.0, 0.0, 0.0, 0.0)
             .build()
         move(pos, 800)
     }
@@ -304,6 +310,7 @@ private class PlayaMapController(private val density: Float) {
             .zoom(16.5)
             .bearing(bearing)
             .tilt(pitchDeg.coerceIn(0.0, 35.0))
+            .padding(0.0, 0.0, 0.0, 0.0)
             .build()
         move(pos, 800)
     }
@@ -327,3 +334,5 @@ private class PlayaMapController(private val density: Float) {
 }
 
 private const val TAP_TOLERANCE_DP = 12f
+/** Share of the map height kept above the car while following (car ends up ~70% down). */
+private const val FOLLOW_TOP_PADDING = 0.4f

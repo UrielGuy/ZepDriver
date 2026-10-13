@@ -13,6 +13,7 @@ import android.os.VibratorManager
 import android.util.Log
 import com.zepdriver.AppPrefs
 import com.zepdriver.core.alerts.Alert
+import com.zepdriver.core.alerts.AlertKind
 import com.zepdriver.core.alerts.AlertLevel
 import com.zepdriver.core.rules.DriveState
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * - CAUTION: silent.
  * - ADVISORY: soft chime once when the alert appears, spoken once.
  * - WARNING: three beeps + vibration when it appears, beeps again every ~8 s
- *   while it persists; spoken once.
+ *   while it persists; spoken once. Speeding is loud: the siren every ~4 s.
  * - ALARM: siren every ~2 s while active plus vibration; speech every ~10 s.
  *
  * Voice priority: ALARM > WARNING > navigation > ADVISORY. Tones play even
@@ -110,10 +111,12 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
                         alert.speechOrTitle()?.let { speech += Utterance(3, it) }
                         s.lastSpeech = now
                     }
-                    if (isNew || now - s.lastSound >= WARNING_REPEAT_MS) {
-                        playBeeps = true
+                    // Speeding is a loud warning: the siren, not the beeps.
+                    val loud = alert.kind == AlertKind.SPEED
+                    if (isNew || now - s.lastSound >= (if (loud) SPEED_WARNING_REPEAT_MS else WARNING_REPEAT_MS)) {
+                        if (loud) playSiren = true else playBeeps = true
                         s.lastSound = now
-                        if (vibration == null) vibration = WARNING_VIBRATION
+                        if (vibration == null) vibration = if (loud) ALARM_VIBRATION else WARNING_VIBRATION
                     }
                 }
                 AlertLevel.ADVISORY -> if (isNew) {
@@ -214,6 +217,7 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
         const val ALARM_REPEAT_MS = 2_000L
         const val ALARM_SPEECH_MS = 10_000L
         const val WARNING_REPEAT_MS = 8_000L
+        const val SPEED_WARNING_REPEAT_MS = 4_000L
         /** Under time warp: at least this long between tones. */
         const val WARP_TONE_GAP_MS = 2_500L
         val WARNING_VIBRATION = longArrayOf(0, 180, 120, 180, 120, 180)

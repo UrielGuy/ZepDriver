@@ -62,7 +62,7 @@ class SpeedMonitorTest {
         val m2 = SpeedMonitor()
         levels(m2, 7.0, 7.0, 7.0)
         assertEquals(ALARM, m2.level)
-        assertEquals("Slow down! Five miles an hour.", m2.alert()!!.speech)
+        assertEquals("Slow down now!", m2.alert()!!.speech)
     }
 
     @Test fun alarmDropsToCautionWhenSlowingSlightly() {

@@ -52,8 +52,6 @@ import kotlinx.coroutines.delay
 
 /** Widest the alert banner and nav panel get (landscape keeps the map's center clear). */
 private val PANEL_MAX_WIDTH = 480.dp
-/** Room the status chip needs beside the panels. */
-private val CHIP_ROOM = 170.dp
 /** Room the speedometer and the Potties button each need beside the info popup. */
 private val SIDE_CONTROLS = 210.dp
 /** While moving, the info popup closes itself after this long. */
@@ -223,34 +221,69 @@ fun DriveScreen(
                 .padding(contentPadding)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
-            val chipBeside = maxWidth >= PANEL_MAX_WIDTH + CHIP_ROOM
-            val popupBeside = maxWidth >= SIDE_CONTROLS * 2 + 280.dp
-            val panelWidth: Dp = if (chipBeside) min(PANEL_MAX_WIDTH, maxWidth - CHIP_ROOM) else PANEL_MAX_WIDTH
+            // Speedometer and Potties live at the top so the car can sit low on the
+            // screen with the route ahead in view (the follow camera is offset to match).
+            val wide = maxWidth >= SIDE_CONTROLS * 2 + 320.dp
+            val speedo: @Composable () -> Unit = { Speedometer(drive?.speedMph, speedLevel, flashOn) }
+            val rightSide: @Composable () -> Unit = {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PottiesButton(
+                        onClick = vm::goToPotties,
+                        pointer = potty,
+                        arrowRotationDeg = potty?.let { (it.bearingDeg - screenUp).toFloat() } ?: 0f,
+                    )
+                    statusRow(Modifier)
+                }
+            }
+            val panels: @Composable (Modifier) -> Unit = { m ->
+                Column(m, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (topAlert != null && topAlert.level != AlertLevel.NONE) {
+                        AlertBanner(topAlert, flashOn, Modifier.fillMaxWidth())
+                    }
+                    if (nav != null) {
+                        val stopped = (drive?.speedMph ?: 0.0) < 0.5
+                        NavPanel(
+                            nav = nav,
+                            stops = ui.stops,
+                            canEnd = stopped || nav.finished || debugUnlocked,
+                            onEnd = vm::stopNavigation,
+                            modifier = Modifier.fillMaxWidth(),
+                            nowMillis = etaNow,
+                        )
+                    }
+                }
+            }
+            if (wide) {
+                // Landscape / tablets: speedometer | alerts + route | Potties, all along the top.
+                Row(Modifier.align(Alignment.TopCenter).fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                    speedo()
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+                        panels(Modifier.widthIn(max = PANEL_MAX_WIDTH).fillMaxWidth())
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    rightSide()
+                }
+            } else {
+                Column(
+                    Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        speedo()
+                        Spacer(Modifier.weight(1f))
+                        rightSide()
+                    }
+                    panels(Modifier.fillMaxWidth())
+                }
+            }
 
-            // Top start: alert and navigation, never wider than PANEL_MAX_WIDTH.
+            // Bottom: only the map popup and the re-center button, so the route ahead stays visible.
             Column(
-                Modifier.align(Alignment.TopStart).widthIn(max = panelWidth).fillMaxWidth(),
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (topAlert != null && topAlert.level != AlertLevel.NONE) {
-                    AlertBanner(topAlert, flashOn, Modifier.fillMaxWidth())
-                }
-                if (nav != null) {
-                    val stopped = (drive?.speedMph ?: 0.0) < 0.5
-                    NavPanel(
-                        nav = nav,
-                        stops = ui.stops,
-                        canEnd = stopped || nav.finished || debugUnlocked,
-                        onEnd = vm::stopNavigation,
-                        modifier = Modifier.fillMaxWidth(),
-                        nowMillis = etaNow,
-                    )
-                }
-                if (!chipBeside) statusRow(Modifier.align(Alignment.End))
-            }
-            if (chipBeside) statusRow(Modifier.align(Alignment.TopEnd))
-
-            val card: @Composable (Modifier) -> Unit = { m ->
                 info?.let { i ->
                     MapInfoCard(
                         info = i,
@@ -259,49 +292,22 @@ fun DriveScreen(
                         onAddStop = { d -> vm.addStop(d); tap = null },
                         onSave = { d -> saving = d },
                         onClose = { tap = null },
-                        modifier = m,
+                        modifier = Modifier.widthIn(max = PANEL_MAX_WIDTH).fillMaxWidth(),
                     )
                 }
-            }
-            val controls: @Composable () -> Unit = {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                    Speedometer(drive?.speedMph, speedLevel, flashOn)
-                    Spacer(Modifier.weight(1f))
-                    Column(horizontalAlignment = Alignment.End) {
-                        if (wantsFollow && detached) {
-                            // Like Google Maps: after panning/zooming, one tap resumes following.
-                            ExtendedFloatingActionButton(
-                                onClick = vm::recenter,
-                                icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
-                                text = { Text("Re-center") },
-                            )
-                            Spacer(Modifier.height(12.dp))
-                        } else if (!wantsFollow) {
-                            FloatingActionButton(onClick = vm::recenter) {
-                                Icon(Icons.Filled.LocationOn, contentDescription = "Center on my car")
-                            }
-                            Spacer(Modifier.height(12.dp))
-                        }
-                        PottiesButton(
-                            onClick = vm::goToPotties,
-                            pointer = potty,
-                            arrowRotationDeg = potty?.let { (it.bearingDeg - screenUp).toFloat() } ?: 0f,
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (wantsFollow && detached) {
+                        // Like Google Maps: after panning/zooming, one tap resumes following.
+                        ExtendedFloatingActionButton(
+                            onClick = vm::recenter,
+                            icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+                            text = { Text("Re-center") },
                         )
+                    } else if (!wantsFollow) {
+                        FloatingActionButton(onClick = vm::recenter) {
+                            Icon(Icons.Filled.LocationOn, contentDescription = "Center on my car")
+                        }
                     }
-                }
-            }
-            if (popupBeside) {
-                // Landscape: speedometer bottom-start, Potties bottom-end, the popup between them.
-                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth()) { controls() }
-                card(Modifier.align(Alignment.BottomCenter).width((maxWidth - SIDE_CONTROLS * 2).coerceAtMost(420.dp)))
-            } else {
-                Column(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    card(Modifier.widthIn(max = PANEL_MAX_WIDTH).fillMaxWidth())
-                    controls()
                 }
             }
         }
