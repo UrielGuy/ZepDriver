@@ -77,7 +77,7 @@ class NavigationSessionTest {
         assertTrue(nextAlong >= mid.first - 1, "instruction $idx behind us")
     }
 
-    @Test fun reroutesAfterThreeOffRouteFixes() {
+    @Test fun reroutesAfterTwoOffRouteFixes() {
         val dest = NavFixtures.campNear("8:30", "C")
         val start = NavFixtures.ll("7:00", 1500.0)
         val s = NavigationSession(router, start, listOf(dest))
@@ -87,7 +87,6 @@ class NavigationSessionTest {
         val a = s.update(fix(off))!!
         assertTrue(a.offRoute)
         assertTrue(a.speech?.contains(NavigationSession.REROUTING) != true)
-        s.update(fix(off + Xy(5.0, 0.0)))
         val c = s.update(fix(off + Xy(10.0, 0.0)))!!
         assertEquals(NavigationSession.REROUTING, c.speech?.substringBefore(". "))
         assertFalse(c.offRoute)
@@ -115,5 +114,22 @@ class NavigationSessionTest {
         // Once the vehicle shows up on the playa, the session plans from there.
         val st = s.update(Fix(1, NavFixtures.ll("6:30", 1500.0), null, null, null))
         assertNotNull(st)
+    }
+
+    @Test fun routeLineAlwaysStartsAtTheCar() {
+        val dest = NavFixtures.campNear("8:30", "C")
+        val start = NavFixtures.ll("7:00", 1500.0)
+        val s = NavigationSession(router, start, listOf(dest))
+        val path = s.state!!.plan.legs[0].path.map(d::xy)
+        // Drive a good way along the planned path.
+        val mid = path[path.size / 2]
+        val st = s.update(fix(mid))!!
+        assertTrue(d.xy(st.legAhead.first()).distanceTo(mid) < 1.0, "line starts at the car")
+        assertTrue(st.legAhead.size < path.size + 2, "driven part is trimmed")
+        assertTrue(d.xy(st.legAhead.last()).distanceTo(path.last()) < 1.0, "still ends at the stop")
+        // A little off to the side: the line still starts at the car and joins the path.
+        val aside = mid + Xy(30.0, 0.0)
+        val st2 = s.update(fix(aside))!!
+        assertTrue(d.xy(st2.legAhead.first()).distanceTo(aside) < 1.0)
     }
 }

@@ -110,10 +110,15 @@ fun DriveScreen(
     }
     val headingMemo = remember(data) { HeadingMemo(data.layout.twelveOClockBearingDeg) }
     val modelHeading = headingMemo.update(fix?.bearingDeg)
-    val meJson = remember(fix, prefs.vehicleModel, profile, modelHeading) {
-        GeoJson.me(data, fix, prefs.vehicleModel, profile, modelHeading)
+    // Glide between GPS fixes so the car, camera and route line move smoothly.
+    val pose by rememberSmoothPose(fix, modelHeading)
+    val drawnFix = pose?.let { p -> fix?.let { f -> f.copy(position = p.position, bearingDeg = f.bearingDeg?.let { p.headingDeg }) } }
+    val meJson = remember(pose, prefs.vehicleModel, profile) {
+        GeoJson.me(data, drawnFix, prefs.vehicleModel, profile, pose?.headingDeg ?: modelHeading)
     }
-    val routeJson = remember(nav?.plan, nav?.legIndex, nav?.finished) { GeoJson.route(nav) }
+    val routeJson = remember(nav?.plan, nav?.legIndex, nav?.finished, nav?.legAhead, pose?.position) {
+        GeoJson.route(nav, carAt = pose?.position)
+    }
     val stopsJson = remember(ui.stops, draft, navigating) {
         if (navigating) GeoJson.stops(ui.stops, draft = false) else GeoJson.stops(draft, draft = true)
     }
@@ -148,7 +153,7 @@ fun DriveScreen(
         follow = following,
         detached = detached,
         onUserGesture = vm::onMapGesture,
-        fix = fix,
+        fix = drawnFix ?: fix,
         pitchDeg = prefs.mapPitchDeg,
         overviewBearing = data.layout.twelveOClockBearingDeg,
         home = data.layout.man.toLatLon(),

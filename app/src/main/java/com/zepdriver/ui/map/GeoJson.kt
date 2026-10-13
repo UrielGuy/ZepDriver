@@ -236,12 +236,19 @@ object GeoJson {
      * The active route: the current leg (`current = true`) and the legs after
      * it, plus a dashed walking segment where the car has to park short.
      */
-    fun route(nav: NavState?): String {
+    /** The route; the current leg starts at [carAt] (the drawn car) when given. */
+    fun route(nav: NavState?, carAt: LatLon? = null): String {
         if (nav == null || nav.finished) return EMPTY
         val b = Builder()
         nav.plan.legs.forEachIndexed { i, leg ->
             if (i < nav.legIndex) return@forEachIndexed
-            b.line(leg.path, mapOf("g" to "drive", "current" to (i == nav.legIndex)))
+            // The current leg is drawn from the car, never from where the route was planned.
+            val current = i == nav.legIndex
+            val path = when {
+                current && nav.legAhead.size >= 2 -> listOfNotNull(carAt ?: nav.legAhead[0]) + nav.legAhead.drop(1)
+                else -> leg.path
+            }
+            b.line(path, mapOf("g" to "drive", "current" to current))
             if (leg.walkFt != null && leg.parkAt != leg.destination.position) {
                 b.line(listOf(leg.parkAt, leg.destination.position), mapOf("g" to "walk", "current" to (i == nav.legIndex)))
             }

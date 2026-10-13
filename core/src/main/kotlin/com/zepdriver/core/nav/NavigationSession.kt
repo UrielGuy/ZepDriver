@@ -21,6 +21,11 @@ data class NavState(
     val speech: String?,
     /** Distance left to the current stop (this leg only); [remainingFt] covers all stops. */
     val toStopFt: Double = remainingFt,
+    /**
+     * What's left of the current leg, starting at the vehicle: its position,
+     * then the path from the point it has reached. Empty when unknown.
+     */
+    val legAhead: List<LatLon> = emptyList(),
 ) {
     /** Minutes to the current stop when driving the speed limit the whole way. */
     fun minutesToStop(mph: Double = ETA_SPEED_MPH): Double = toStopFt / (mph * FEET_PER_MILE / 60.0)
@@ -175,7 +180,10 @@ class NavigationSession(
         val toStop = max(0.0, g.length - progress)
         var rem = toStop
         for (k in legIndex + 1 until p.legs.size) rem += p.legs[k].distanceFt
-        return NavState(p, legIndex, next, toNext, rem, offRoute, false, out.joinToString(". ").ifEmpty { null }, toStop)
+        return NavState(
+            p, legIndex, next, toNext, rem, offRoute, false, out.joinToString(". ").ifEmpty { null }, toStop,
+            legAhead = g.ahead(xy, progress).map { router.playa.latLon(it) },
+        )
     }
 
     private fun arrivalSpeech(leg: RouteLeg): String = leg.walkFt?.let {
@@ -189,6 +197,22 @@ class NavigationSession(
         val length = al.last()
         val end: Xy = router.playa.xy(leg.parkAt)
         val instructionAlong = DoubleArray(leg.instructions.size) { al[leg.instructions[it].pathIndex.coerceIn(0, pts.lastIndex)] }
+
+        /** The vehicle at [car], then the path from [along] to the end. */
+        fun ahead(car: Xy, along: Double): List<Xy> {
+            val out = arrayListOf(car)
+            var k = 0
+            while (k < pts.size - 1 && al[k + 1] <= along) k++
+            if (k < pts.size - 1) {
+                val segLen = al[k + 1] - al[k]
+                val t = if (segLen > 0) ((along - al[k]) / segLen).coerceIn(0.0, 1.0) else 0.0
+                out += pts[k] + (pts[k + 1] - pts[k]) * t
+                for (j in k + 1 until pts.size) out += pts[j]
+            } else {
+                out += pts.last()
+            }
+            return out
+        }
 
         /** (along, distance) of the closest path point, preferring points not far behind [hint]. */
         fun nearest(p: Xy, hint: Double): Pair<Double, Double> {
@@ -209,8 +233,9 @@ class NavigationSession(
 
     companion object {
         const val ARRIVE_FT = 60.0
-        const val OFF_ROUTE_FT = 100.0
-        const val OFF_ROUTE_UPDATES = 3
+        /** Farther than this from the path for [OFF_ROUTE_UPDATES] fixes in a row: replan from here. */
+        const val OFF_ROUTE_FT = 60.0
+        const val OFF_ROUTE_UPDATES = 2
         const val FAR_FT = 300.0
         const val NEAR_FT = 80.0
         const val REROUTING = Speech.REROUTING

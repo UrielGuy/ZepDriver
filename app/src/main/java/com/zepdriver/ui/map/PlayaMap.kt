@@ -137,7 +137,7 @@ fun PlayaMap(
     }
 
     // Moving: follow every fix, heading-up.
-    LaunchedEffect(camera.follow, camera.fix?.timeMillis, camera.pitchDeg) {
+    LaunchedEffect(camera.follow, camera.fix, camera.pitchDeg) {
         val fix = camera.fix
         if (camera.follow && fix != null) controller.follow(fix, camera.pitchDeg)
     }
@@ -275,11 +275,17 @@ private class PlayaMapController(private val density: Float) {
             .bearing(fix.bearingDeg ?: current?.bearing ?: 0.0)
             .tilt(pitchDeg.coerceIn(0.0, 60.0))
             .build()
-        // Glide until about the next fix: 1 Hz GPS, or faster from the simulator at high warp.
+        // The drawn car is smoothed per frame, so frequent calls just track it exactly;
+        // a lone update (first fix, resuming follow) eases in.
         val now = SystemClock.elapsedRealtime()
         val gap = now - lastFollowAt
         lastFollowAt = now
-        move(pos, gap.coerceIn(200L, 900L).toInt())
+        val m = map
+        if (m != null && gap < 150) {
+            m.moveCamera(CameraUpdateFactory.newCameraPosition(pos))
+        } else {
+            move(pos, 600)
+        }
     }
 
     fun overview(center: LatLon, bearing: Double, pitchDeg: Double, wide: Boolean) {
