@@ -30,6 +30,11 @@ android {
             "\"https://raw.githubusercontent.com/UrielGuy/ZepDriver/HEAD/app/src/main/assets/playa/\"",
         )
         buildConfigField("int", "DATA_YEAR", "2026")
+        // Phones only: dropping the x86 emulator builds of MapLibre's native
+        // library roughly halves the APK.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {
