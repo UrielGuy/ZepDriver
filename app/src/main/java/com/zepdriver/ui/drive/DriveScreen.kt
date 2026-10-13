@@ -2,6 +2,7 @@ package com.zepdriver.ui.drive
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -26,26 +28,50 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.min
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zepdriver.DriveUiState
 import com.zepdriver.PlayaBundle
 import com.zepdriver.core.alerts.AlertLevel
+import com.zepdriver.core.nav.Destination
 import com.zepdriver.core.nav.ToiletFinder
 import com.zepdriver.ui.MainViewModel
+import com.zepdriver.ui.common.FavoriteLabelDialog
 import com.zepdriver.ui.common.rememberFlash
 import com.zepdriver.ui.common.rememberNow
 import com.zepdriver.ui.map.GeoJson
 import com.zepdriver.ui.map.MapCamera
 import com.zepdriver.ui.map.MapStyle
+import com.zepdriver.ui.map.MapTap
 import com.zepdriver.ui.map.PlayaMap
 import com.zepdriver.ui.sim.SimOverlay
 import com.zepdriver.ui.theme.Zep
+import kotlinx.coroutines.delay
+
+/** Widest the alert banner and nav panel get (landscape keeps the map's center clear). */
+private val PANEL_MAX_WIDTH = 480.dp
+/** Room the status chip needs beside the panels. */
+private val CHIP_ROOM = 170.dp
+/** Room the speedometer and the Potties button each need beside the info popup. */
+private val SIDE_CONTROLS = 210.dp
+/** While moving, the info popup closes itself after this long. */
+private const val POPUP_MOVING_MILLIS = 8_000L
+
+/** Remembers the last known heading so the car model keeps facing that way when stopped. */
+private class HeadingMemo(var deg: Double) {
+    fun update(bearing: Double?): Double {
+        if (bearing != null) deg = bearing
+        return deg
+    }
+}
 
 /**
- * The home screen in both modes: 3D map, speedometer, alerts, address,
- * navigation and the Potties button. While [locked] (moving or navigating)
- * nothing else on it is interactive.
+ * The home screen in both modes: 3D map, speedometer, alerts, navigation and
+ * the Potties button, with small GPS/radio indicators in a corner. Tapping the
+ * map shows what's there (and your own BRC address when you tap your car).
+ * While [locked] (moving) the popup is info only.
  */
 @Composable
 fun DriveScreen(
@@ -67,6 +93,9 @@ fun DriveScreen(
     val focus by vm.focus.collectAsStateWithLifecycle()
     val recenter by vm.recenter.collectAsStateWithLifecycle()
     val detached by vm.mapDetached.collectAsStateWithLifecycle()
+    val simState by vm.sim.state.collectAsStateWithLifecycle()
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
     val now by rememberNow(15_000L)
 
     val data = bundle.data
@@ -79,15 +108,17 @@ fun DriveScreen(
     val styleJson = remember(bundle.uriPrefix, colors.map) {
         MapStyle.build(bundle.uriPrefix, colors.map, data.layout.man.lat)
     }
-    val meJson = remember(fix) { GeoJson.me(data, fix) }
+    val headingMemo = remember(data) { HeadingMemo(data.layout.twelveOClockBearingDeg) }
+    val modelHeading = headingMemo.update(fix?.bearingDeg)
+    val meJson = remember(fix, prefs.vehicleModel, profile, modelHeading) {
+        GeoJson.me(data, fix, prefs.vehicleModel, profile, modelHeading)
+    }
     val routeJson = remember(nav?.plan, nav?.legIndex, nav?.finished) { GeoJson.route(nav) }
     val stopsJson = remember(ui.stops, draft, navigating) {
         if (navigating) GeoJson.stops(ui.stops, draft = false) else GeoJson.stops(draft, draft = true)
     }
     val fleetJson = remember(fleet, now) { GeoJson.fleet(fleet, now) }
     val focusJson = remember(focus) { GeoJson.focus(focus?.position) }
-    val profile by vm.profile.collectAsStateWithLifecycle()
-    val favorites by vm.favorites.collectAsStateWithLifecycle()
     val placesJson = remember(profile.homeCamp, favorites) { GeoJson.places(profile.homeCamp, favorites) }
     val layers = staticLayers
     val sources = remember(zonesJson, layers, trailJson, meJson, routeJson, stopsJson, fleetJson, focusJson, placesJson) {
@@ -143,62 +174,128 @@ fun DriveScreen(
     val alarm = speedLevel == AlertLevel.ALARM || topAlert?.level == AlertLevel.ALARM
     val flashOn = rememberFlash(alarm)
 
-    Box(modifier.fillMaxSize()) {
-        PlayaMap(styleJson = styleJson, sources = sources, camera = camera, modifier = Modifier.fillMaxSize())
+    // --- Tap-for-info popup --------------------------------------------------------------
+    var tap by remember { mutableStateOf<MapTap?>(null) }
+    var saving by remember { mutableStateOf<Destination?>(null) }
+    val shownStops = if (navigating) ui.stops else draft
+    val info = remember(tap, drive, fleet, shownStops, favorites, profile, now) {
+        tap?.let { describeTap(it, bundle, drive, fleet, shownStops, favorites, profile, System.currentTimeMillis()) }
+    }
+    // Moving: info only, and it goes away by itself.
+    LaunchedEffect(tap, locked) {
+        if (tap != null && locked) {
+            delay(POPUP_MOVING_MILLIS)
+            tap = null
+        }
+    }
+    val onTap: (MapTap) -> Unit = { t ->
+        // With a popup open, tapping empty playa just closes it.
+        tap = if (tap != null && t.kind == MapTap.KIND_SPOT) null else t
+    }
+    // The simulator's ETA clock runs on simulated (possibly warped) time.
+    val etaNow = if (simState.enabled) fix?.timeMillis ?: System.currentTimeMillis() else System.currentTimeMillis()
 
-        Column(
+    Box(modifier.fillMaxSize()) {
+        PlayaMap(
+            styleJson = styleJson,
+            sources = sources,
+            camera = camera,
+            modifier = Modifier.fillMaxSize(),
+            onTap = onTap,
+            onLongPress = vm::teleportSim,
+        )
+
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .padding(contentPadding)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (topAlert != null && topAlert.level != AlertLevel.NONE) {
-                AlertBanner(topAlert, flashOn)
-            }
-            if (nav != null) {
-                val stopped = (drive?.speedMph ?: 0.0) < 0.5
-                NavPanel(
-                    nav = nav,
-                    stops = ui.stops,
-                    canEnd = stopped || nav.finished,
-                    onEnd = vm::stopNavigation,
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                Speedometer(drive?.speedMph, speedLevel, flashOn)
-                Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End) {
-                    if (wantsFollow && detached) {
-                        // Like Google Maps: after panning/zooming, one tap resumes following.
-                        ExtendedFloatingActionButton(
-                            onClick = vm::recenter,
-                            icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
-                            text = { Text("Re-center") },
-                        )
-                        Spacer(Modifier.height(12.dp))
-                    } else if (!wantsFollow) {
-                        FloatingActionButton(onClick = vm::recenter) {
-                            Icon(Icons.Filled.LocationOn, contentDescription = "Center on my car")
-                        }
-                        Spacer(Modifier.height(12.dp))
-                    }
-                    PottiesButton(
-                        onClick = vm::goToPotties,
-                        pointer = potty,
-                        arrowRotationDeg = potty?.let { (it.bearingDeg - screenUp).toFloat() } ?: 0f,
+            val chipBeside = maxWidth >= PANEL_MAX_WIDTH + CHIP_ROOM
+            val popupBeside = maxWidth >= SIDE_CONTROLS * 2 + 280.dp
+            val panelWidth: Dp = if (chipBeside) min(PANEL_MAX_WIDTH, maxWidth - CHIP_ROOM) else PANEL_MAX_WIDTH
+
+            // Top start: alert and navigation, never wider than PANEL_MAX_WIDTH.
+            Column(
+                Modifier.align(Alignment.TopStart).widthIn(max = panelWidth).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (topAlert != null && topAlert.level != AlertLevel.NONE) {
+                    AlertBanner(topAlert, flashOn, Modifier.fillMaxWidth())
+                }
+                if (nav != null) {
+                    val stopped = (drive?.speedMph ?: 0.0) < 0.5
+                    NavPanel(
+                        nav = nav,
+                        stops = ui.stops,
+                        canEnd = stopped || nav.finished,
+                        onEnd = vm::stopNavigation,
+                        modifier = Modifier.fillMaxWidth(),
+                        nowMillis = etaNow,
                     )
                 }
-                Spacer(Modifier.width(0.dp))
+                if (!chipBeside) {
+                    StatusChip(fix, mesh, fleet.size, ui.routerBusy, Modifier.align(Alignment.End))
+                }
             }
-            AddressBar(
-                address = drive?.address,
-                fix = fix,
-                mesh = mesh,
-                fleetCount = fleet.size,
-                routerBusy = ui.routerBusy,
-            )
+            if (chipBeside) {
+                StatusChip(fix, mesh, fleet.size, ui.routerBusy, Modifier.align(Alignment.TopEnd))
+            }
+
+            val card: @Composable (Modifier) -> Unit = { m ->
+                info?.let { i ->
+                    MapInfoCard(
+                        info = i,
+                        showActions = !locked,
+                        onGoNow = { d -> vm.goNow(d); tap = null },
+                        onAddStop = { d -> vm.addStop(d); tap = null },
+                        onSave = { d -> saving = d },
+                        onClose = { tap = null },
+                        modifier = m,
+                    )
+                }
+            }
+            val controls: @Composable () -> Unit = {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    Speedometer(drive?.speedMph, speedLevel, flashOn)
+                    Spacer(Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        if (wantsFollow && detached) {
+                            // Like Google Maps: after panning/zooming, one tap resumes following.
+                            ExtendedFloatingActionButton(
+                                onClick = vm::recenter,
+                                icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
+                                text = { Text("Re-center") },
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        } else if (!wantsFollow) {
+                            FloatingActionButton(onClick = vm::recenter) {
+                                Icon(Icons.Filled.LocationOn, contentDescription = "Center on my car")
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        PottiesButton(
+                            onClick = vm::goToPotties,
+                            pointer = potty,
+                            arrowRotationDeg = potty?.let { (it.bearingDeg - screenUp).toFloat() } ?: 0f,
+                        )
+                    }
+                }
+            }
+            if (popupBeside) {
+                // Landscape: speedometer bottom-start, Potties bottom-end, the popup between them.
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth()) { controls() }
+                card(Modifier.align(Alignment.BottomCenter).width((maxWidth - SIDE_CONTROLS * 2).coerceAtMost(420.dp)))
+            } else {
+                Column(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    card(Modifier.widthIn(max = PANEL_MAX_WIDTH).fillMaxWidth())
+                    controls()
+                }
+            }
         }
 
         if (alarm) AlarmBorder(flashOn)
@@ -210,6 +307,18 @@ fun DriveScreen(
                 .align(Alignment.CenterStart)
                 .padding(contentPadding)
                 .padding(start = 20.dp),
+        )
+    }
+
+    saving?.let { dest ->
+        FavoriteLabelDialog(
+            initialCustom = dest.name,
+            onDismiss = { saving = null },
+            onSave = { label ->
+                vm.saveFavorite(label, dest)
+                saving = null
+                tap = null
+            },
         )
     }
 }

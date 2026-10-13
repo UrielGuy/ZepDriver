@@ -8,8 +8,9 @@ An Android app for Burning Man Mutant Vehicle (art car) drivers:
   not driven along. The Great Circle, Center Camp and walk-in camping are
   off limits. The rules are coded per year and per license type.
 - **Offline map and search:** a 3D playa map, search over camps, art and BRC
-  addresses, favorites, and your position shown as a BRC address
-  ("7:45 & Esplanade").
+  addresses, favorites, and tap-for-info on the map: tap your car (a 3D art
+  car, car, pickup, school bus or golf cart, your pick) to see your BRC
+  address ("7:45 & Esplanade"), or tap a camp, art piece or fleet car.
 - **Navigation:** multiple stops, an 80 ft art safe distance, street routing
   in the city that follows your license, and a one-tap **Potties** button.
 - **Fleet mesh:** a cheap Meshtastic LoRa radio (Heltec V3), flashed and set
@@ -46,9 +47,11 @@ to build only `:core`.
 Debug builds (the APK CI publishes) have **Settings → Simulator**. It
 replaces GPS with a simulated car at Black Rock City: drive it with an
 on-screen pad, run a guided tour that sets off each warning in turn, or let
-it follow the active route. Optional fake fleet cars show up in the fleet
-view. Simulated positions are never sent over the mesh, but they are recorded
-in the trip log. The simulator is always off when the app starts.
+it follow the active route. Time can run faster (×2 to ×20) so you don't
+have to wait out real playa speed, and long-pressing the map moves the car
+there. Optional fake fleet cars show up in the fleet view. Simulated
+positions are never sent over the mesh, but they are recorded in the trip
+log. The simulator is always off when the app starts.
 
 ## Data
 

@@ -8,6 +8,24 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.cos
 import kotlin.math.pow
 
+/** Colors of our own vehicle's 3D model, by [com.zepdriver.core.vehicles.VehiclePart]. */
+data class VehiclePalette(
+    val hull: String,
+    val red: String,
+    val blue: String,
+    val yellow: String,
+    val white: String,
+    val glass: String,
+    val tire: String,
+    val trim: String,
+    val deck: String,
+    val light: String,
+    val tail: String,
+    val neon: String,
+    val neonAlt: String,
+    val flame: String,
+)
+
 /** Map colors for one theme, as CSS hex strings for the style JSON. */
 data class MapPalette(
     val ground: String,
@@ -51,6 +69,8 @@ data class MapPalette(
     /** Home marker and saved favorites. */
     val home: String,
     val favorite: String,
+    /** Our own vehicle's model: bright and cheerful in both themes. */
+    val vehicle: VehiclePalette,
 )
 
 object MapPalettes {
@@ -95,6 +115,22 @@ object MapPalettes {
         mast = "#7A7A7A",
         home = "#1F4FD1",
         favorite = "#E0A800",
+        vehicle = VehiclePalette(
+            hull = "#8E24D8",
+            red = "#E53935",
+            blue = "#1E6FE0",
+            yellow = "#F7B500",
+            white = "#FAFAFA",
+            glass = "#2E4A62",
+            tire = "#1B1B1B",
+            trim = "#2B2B2B",
+            deck = "#B07A45",
+            light = "#FFF176",
+            tail = "#FF1744",
+            neon = "#00D8F0",
+            neonAlt = "#FF2DAA",
+            flame = "#FF7A00",
+        ),
     )
 
     /** Dark, dim and red/amber shifted to keep night vision. */
@@ -138,6 +174,23 @@ object MapPalettes {
         mast = "#3C2E24",
         home = "#FF9A3D",
         favorite = "#D9AE52",
+        // Still cheerful at night, a touch dimmer so it doesn't glare.
+        vehicle = VehiclePalette(
+            hull = "#A64AE0",
+            red = "#D8433A",
+            blue = "#3F7FD8",
+            yellow = "#E0A81E",
+            white = "#D8D0C4",
+            glass = "#28323E",
+            tire = "#0C0C0C",
+            trim = "#3A3030",
+            deck = "#8A5A32",
+            light = "#FFE08A",
+            tail = "#FF3030",
+            neon = "#3FD8E8",
+            neonAlt = "#FF4FB8",
+            flame = "#FF8A1A",
+        ),
     )
 }
 
@@ -163,6 +216,22 @@ object MapStyle {
     const val SRC_FOCUS = "focus"
     const val SRC_LANDMARKS = "landmarks"
     const val SRC_PLACES = "places"
+
+    /**
+     * Layers the driver can tap for info, topmost first, with the kind each
+     * reports (a feature's own `kind` property wins). See GeoJson.KIND_*.
+     */
+    val TAP_LAYERS: List<Pair<String, List<String>>> = listOf(
+        GeoJson.KIND_ME to listOf("me-model", "me-dot"),
+        GeoJson.KIND_FLEET to listOf("fleet", "fleet-labels"),
+        GeoJson.KIND_STOP to listOf("stops", "stop-numbers"),
+        GeoJson.KIND_FAVORITE to listOf("places", "home-label", "favorite-labels"),
+        GeoJson.KIND_ART to listOf("art", "art-labels"),
+        GeoJson.KIND_TOILET to listOf("toilet-dots", "toilet-labels", "toilets"),
+        GeoJson.KIND_CAMP to listOf("camps", "camp-labels"),
+        GeoJson.KIND_POI to listOf("poi-labels"),
+        GeoJson.KIND_LANDMARK to listOf("landmarks"),
+    )
 
     val DYNAMIC_SOURCES = listOf(
         SRC_ZONES, SRC_ART, SRC_ART_POINTS, SRC_CAMPS, SRC_TOILET_POINTS,
@@ -201,11 +270,13 @@ object MapStyle {
             minzoom: Double? = null,
             layout: Map<String, Any?> = emptyMap(),
             paint: Map<String, Any?> = emptyMap(),
+            maxzoom: Double? = null,
         ) {
             val m = linkedMapOf<String, Any?>("id" to id, "type" to type)
             if (source != null) m["source"] = source
             if (filter != null) m["filter"] = filter
             if (minzoom != null) m["minzoom"] = minzoom
+            if (maxzoom != null) m["maxzoom"] = maxzoom
             if (layout.isNotEmpty()) m["layout"] = layout
             if (paint.isNotEmpty()) m["paint"] = paint
             layers += m
@@ -452,15 +523,36 @@ object MapStyle {
             "circle-stroke-color" to p.focus,
             "circle-stroke-width" to 4.0,
         ))
-        layer("me-dot", "circle", SRC_ME, eq("g", "pt"), paint = mapOf(
+        // Our own vehicle: a dot to find it when zoomed out, and its 3D model.
+        layer("me-dot", "circle", SRC_ME, eq("g", "pt"), maxzoom = 15.0, paint = mapOf(
             "circle-color" to p.me,
-            "circle-radius" to 9.0,
+            "circle-radius" to 8.0,
             "circle-stroke-color" to p.meStroke,
             "circle-stroke-width" to 3.0,
         ))
-        layer("me-arrow", "fill", SRC_ME, eq("g", "arrow"), paint = mapOf(
-            "fill-color" to p.me,
-            "fill-outline-color" to p.meStroke,
+        val v = p.vehicle
+        layer("me-model", "fill-extrusion", SRC_ME, eq("g", "model"), paint = mapOf(
+            "fill-extrusion-color" to listOf(
+                "match", listOf("get", "part"),
+                "HULL", v.hull,
+                "RED", v.red,
+                "BLUE", v.blue,
+                "YELLOW", v.yellow,
+                "WHITE", v.white,
+                "GLASS", v.glass,
+                "TIRE", v.tire,
+                "TRIM", v.trim,
+                "DECK", v.deck,
+                "LIGHT", v.light,
+                "TAIL", v.tail,
+                "NEON", v.neon,
+                "NEON_ALT", v.neonAlt,
+                "FLAME", v.flame,
+                v.hull,
+            ),
+            "fill-extrusion-base" to listOf("get", "base"),
+            "fill-extrusion-height" to listOf("get", "top"),
+            "fill-extrusion-opacity" to 1.0,
         ))
 
         val style = linkedMapOf<String, Any?>(

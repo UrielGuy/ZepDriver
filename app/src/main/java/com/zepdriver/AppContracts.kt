@@ -3,6 +3,7 @@ package com.zepdriver
 import android.net.Uri
 import com.zepdriver.core.brc.BrcAddressing
 import com.zepdriver.core.data.PlayaData
+import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.mesh.FleetVehicle
 import com.zepdriver.core.mesh.MeshText
 import com.zepdriver.core.nav.Destination
@@ -14,6 +15,7 @@ import com.zepdriver.core.search.SearchIndex
 import com.zepdriver.core.sim.SimMode
 import com.zepdriver.core.sim.SimStart
 import com.zepdriver.core.trip.TripPoint
+import com.zepdriver.core.vehicles.VehicleModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
@@ -61,6 +63,8 @@ data class AppPrefs(
     val showPottyArrow: Boolean = true,
     /** Map tilt for the 3D view while driving, degrees. */
     val mapPitchDeg: Double = 55.0,
+    /** How our own car is drawn on the map. */
+    val vehicleModel: VehicleModel = VehicleModel.ART_CAR,
 )
 
 @Serializable
@@ -173,6 +177,11 @@ data class SimState(
     val following: Boolean = false,
     /** Made-up vehicles (and one hello message) in the fleet view; never transmitted. */
     val fakeFleet: Boolean = false,
+    /**
+     * Time warp: simulated time runs this many times faster than real time
+     * (1, 2, 5, 10 or 20; see SimClock). Speeds stay real playa speeds.
+     */
+    val warp: Int = 1,
 )
 
 /**
@@ -198,6 +207,10 @@ interface SimulatorController {
     fun stop()
     /** TOUR: jumps to the next segment. */
     fun nextSegment()
+    /** Sets the time warp (see [SimState.warp]). */
+    fun setWarp(warp: Int)
+    /** Moves the simulated car to [position], keeping its heading, and stops it. In TOUR mode this takes over (MANUAL). */
+    fun teleport(position: LatLon)
 }
 
 /** Service locator, initialised by [ZepApp.onCreate]. */

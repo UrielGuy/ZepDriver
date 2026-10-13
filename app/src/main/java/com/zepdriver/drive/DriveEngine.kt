@@ -17,6 +17,7 @@ import com.zepdriver.core.profile.VehicleProfile
 import com.zepdriver.core.rules.DriveMonitor
 import com.zepdriver.core.rules.DriveState
 import com.zepdriver.core.rules.DrivingMode
+import com.zepdriver.core.sim.SimClock
 import com.zepdriver.core.trip.TripPoint
 import com.zepdriver.data.TripLogImpl
 import com.zepdriver.mesh.MeshControllerImpl
@@ -96,9 +97,10 @@ class DriveEngine(
     // --- called by SimulatorControllerImpl ---------------------------------------
 
     /**
-     * Replaces GPS with [source], ticked at 1 Hz on the engine thread, or goes
-     * back to GPS with null. Either way the drive starts afresh: navigation
-     * ends and the monitor forgets the previous track.
+     * Replaces GPS with [source], ticked on the engine thread (1 Hz, up to 4 Hz
+     * at high time warp so motion stays smooth), or goes back to GPS with null.
+     * Either way the drive starts afresh: navigation ends and the monitor
+     * forgets the previous track.
      */
     fun setSimulation(source: SimFixSource?) = post {
         if (source === sim) return@post
@@ -118,7 +120,8 @@ class DriveEngine(
                     } catch (e: Exception) {
                         Log.e(TAG, "simulator tick failed", e)
                     }
-                    delay((SIM_TICK_MS - (SystemClock.elapsedRealtime() - now)).coerceIn(10L, SIM_TICK_MS))
+                    val tick = SimClock.tickMillis(source.warp)
+                    delay((tick - (SystemClock.elapsedRealtime() - now)).coerceIn(10L, tick))
                 }
             }
         }
@@ -126,6 +129,20 @@ class DriveEngine(
 
     /** Runs [block] on the engine thread (where the simulator's state lives). */
     fun onEngine(block: () -> Unit) = post(block)
+
+    /**
+     * The simulated car was moved by hand (teleport or a new start point): the
+     * monitor forgets the old track so the jump doesn't read as a heading, and
+     * the trip log starts a new point. An active route reroutes by itself.
+     */
+    fun onSimulatedJump() = post {
+        lastLogged = null
+        lastLoggedLevel = AlertLevel.NONE
+        bundle?.let { b ->
+            monitor = runCatching { DriveMonitor(b.data, b.ruleSet, profile) }
+                .onFailure { Log.e(TAG, "DriveMonitor failed", it) }.getOrNull()
+        }
+    }
 
     // --- called by DriveControllerImpl ----------------------------------------
 
@@ -368,7 +385,7 @@ class DriveEngine(
 
         alerts?.let { player ->
             try {
-                player.update(drive, navSpeech)
+                player.update(drive, navSpeech, warp = if (simulated) sim?.warp ?: 1 else 1)
             } catch (e: Exception) {
                 Log.e(TAG, "alert output failed", e)
             }
@@ -420,7 +437,6 @@ class DriveEngine(
         const val TAG = "DriveEngine"
         const val STALE_FIX_MS = 30_000L
         const val HOUR_MS = 3_600_000L
-        const val SIM_TICK_MS = 1_000L
         const val MAX_SIM_STEP_MS = 3_000L
     }
 }

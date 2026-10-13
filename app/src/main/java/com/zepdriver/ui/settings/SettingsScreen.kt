@@ -30,6 +30,7 @@ import com.zepdriver.PlayaBundle
 import com.zepdriver.ThemeMode
 import com.zepdriver.core.rules.Zone
 import com.zepdriver.core.rules.ZoneKind
+import com.zepdriver.core.vehicles.VehicleModel
 import com.zepdriver.ui.MainViewModel
 import com.zepdriver.ui.SettingsSection
 import com.zepdriver.ui.common.Fmt
@@ -111,6 +112,21 @@ private fun AppSection(vm: MainViewModel) {
             selected = prefs.themeMode == ThemeMode.NIGHT,
             onClick = { vm.updatePrefs(vm.prefs.value.copy(themeMode = ThemeMode.NIGHT)) },
         )
+
+        SectionTitle("My vehicle on the map")
+        Text(
+            "A 3D model drawn larger than life so you can spot yourself. Tap it on the map to see your address.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        for (m in VehicleModel.entries) {
+            RadioRow(
+                title = m.label,
+                subtitle = m.description,
+                selected = prefs.vehicleModel == m,
+                onClick = { vm.updatePrefs(vm.prefs.value.copy(vehicleModel = m)) },
+            )
+        }
 
         SectionTitle("Map")
         SwitchRow(

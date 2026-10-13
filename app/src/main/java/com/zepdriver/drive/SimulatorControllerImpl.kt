@@ -4,10 +4,12 @@ import com.zepdriver.SimState
 import com.zepdriver.SimulatorController
 import com.zepdriver.core.data.PlayaData
 import com.zepdriver.core.geo.Fix
+import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.mesh.MeshText
 import com.zepdriver.core.nav.NavState
 import com.zepdriver.core.sim.FakeFleet
 import com.zepdriver.core.sim.PlayaSimulator
+import com.zepdriver.core.sim.SimClock
 import com.zepdriver.core.sim.SimMode
 import com.zepdriver.core.sim.SimStart
 import com.zepdriver.mesh.MeshControllerImpl
@@ -18,18 +20,23 @@ import kotlinx.coroutines.flow.update
 
 /** Supplies simulated fixes in place of GPS. Called on the drive engine's thread only. */
 interface SimFixSource {
+    /** Time warp: simulated time runs this many times faster than real time. */
+    val warp: Int
+
     /**
-     * The fix [dtMillis] after the previous one, stamped [nowMillis]. [nav] is
-     * the current navigation state (followed in autopilot mode). Null skips
-     * this tick.
+     * The fix [dtMillis] of real time after the previous one ([nowMillis] is
+     * the wall clock). The fix is stamped with simulated time, which runs
+     * [warp] times faster. [nav] is the current navigation state (followed in
+     * autopilot mode). Null skips this tick.
      */
     fun nextFix(data: PlayaData, nowMillis: Long, dtMillis: Long, nav: NavState?): Fix?
 }
 
 /**
  * [SimulatorController] backed by the core [PlayaSimulator]. While enabled,
- * [DriveEngine] ticks it at 1 Hz instead of using GPS. All simulator state
- * lives on the engine thread; commands are posted there.
+ * [DriveEngine] ticks it (1–4 Hz, faster at high warp) instead of using GPS.
+ * Simulated time comes from a [SimClock]. All simulator state lives on the
+ * engine thread; commands are posted there.
  */
 class SimulatorControllerImpl(
     private val engine: DriveEngine,
@@ -46,14 +53,18 @@ class SimulatorControllerImpl(
     private var simData: PlayaData? = null
     private var fleet: FakeFleet? = null
     private var fleetData: PlayaData? = null
+    private var clock: SimClock? = null
+
+    override val warp: Int get() = _state.value.warp
 
     override fun setEnabled(enabled: Boolean) = command {
         if (enabled == _state.value.enabled) return@command
         sim = null
         simData = null
+        clock = null
         stopFleet()
         _state.update {
-            SimState(enabled = enabled, mode = it.mode, start = it.start)
+            SimState(enabled = enabled, mode = it.mode, start = it.start, warp = it.warp)
         }
         engine.setSimulation(if (enabled) this else null)
     }
@@ -66,7 +77,10 @@ class SimulatorControllerImpl(
 
     override fun setStart(start: SimStart) = command {
         _state.update { it.copy(start = start) }
-        sim?.setStart(start)
+        sim?.let {
+            it.setStart(start)
+            engine.onSimulatedJump()
+        }
         publish()
     }
 
@@ -96,6 +110,20 @@ class SimulatorControllerImpl(
         publish()
     }
 
+    override fun setWarp(warp: Int) = command {
+        val w = SimClock.clampWarp(warp)
+        _state.update { it.copy(warp = w) }
+        clock?.warp = w
+    }
+
+    override fun teleport(position: LatLon) = command {
+        val ps = sim ?: return@command
+        val data = simData ?: return@command
+        ps.teleport(data.xy(position))
+        engine.onSimulatedJump()
+        publish()
+    }
+
     // --- SimFixSource (engine thread) ----------------------------------------------
 
     override fun nextFix(data: PlayaData, nowMillis: Long, dtMillis: Long, nav: NavState?): Fix? {
@@ -110,8 +138,13 @@ class SimulatorControllerImpl(
             val plan = nav?.takeIf { !it.finished }?.plan
             ps.followRoute(plan, plan?.path)
         }
-        val fix = ps.step(dtMillis, nowMillis)
-        if (s.fakeFleet) tickFleet(data, nowMillis, dtMillis)
+        // Simulated time: starts at the wall clock, then runs `warp` times faster (and never backwards).
+        val c = clock ?: SimClock(nowMillis, s.warp).also { clock = it }
+        c.warp = s.warp
+        val simDt = c.advance(dtMillis)
+        val simNow = c.nowMillis
+        val fix = ps.step(simDt, simNow)
+        if (s.fakeFleet) tickFleet(data, simNow, simDt)
         publish()
         return fix
     }

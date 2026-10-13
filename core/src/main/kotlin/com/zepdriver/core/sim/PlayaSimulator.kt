@@ -134,6 +134,22 @@ class PlayaSimulator(
     }
 
     /**
+     * Moves the car to [to] (local feet), keeping its heading, and stops it. In
+     * [SimMode.TOUR] the driver takes over ([SimMode.MANUAL]).
+     */
+    fun teleport(to: Xy) {
+        if (mode == SimMode.TOUR) setMode(SimMode.MANUAL)
+        vehicle.teleport(to, vehicle.headingDeg, 0.0)
+        vehicle.targetSpeedMph = 0.0
+        vehicle.steerRateDegPerSec = 0.0
+        if (mode == SimMode.AUTOPILOT) {
+            // Re-acquire the route from the new position.
+            routeKey = null
+            routeSet = false
+        }
+    }
+
+    /**
      * The route to follow in [SimMode.AUTOPILOT]: [path] is rebuilt only when
      * [key] changes (pass the route plan object). Null = no route: slow to a stop.
      */

@@ -26,7 +26,7 @@ ruleset.
 | Mode | Entered when | What the driver can do |
 |------|--------------|------------------------|
 | **Parked** | Speed < ~0.5 mph for a few seconds and no active route | Everything: search, favorites, settings, plan routes, messaging, flashing the radio, export trips |
-| **Moving** | Speed above threshold | Read-only. Live controls: the **Potties** button (inserts nearest porta-potty bank as the next stop), and panning/zooming the map with **Re-center** |
+| **Moving** | Speed above threshold | Read-only. Live controls: the **Potties** button (inserts nearest porta-potty bank as the next stop), panning/zooming the map with **Re-center**, and tapping the map for info (no actions; the popup closes itself) |
 
 Stopped mid-route the app unlocks: searching and choosing **Go now** makes
 the place the next stop of the current route (or starts a route if there is
@@ -108,9 +108,17 @@ and routing:
 
 ## 5. Location display
 
-- Current position shown as a **BRC address**: `7:45 & Esplanade`,
+- Tapping your own car on the map shows where you are as a **BRC address**
+  (plus your speed): `7:45 & Esplanade`,
   `4:30 & G (mid-block)`, or `Deep playa 2:00 @ 3,400 ft`.
 - Search accepts BRC addresses ("4:30 & G").
+- Tapping anything else on the map shows a small popup: fleet cars (address,
+  when last heard, speed), camps, art, potties, places, favorites, Home and the
+  landmarks (name, kind, address, short description), or the BRC address of
+  an empty spot. Parked, it offers **Go now**, **Add stop** and **Save**.
+- The driving view keeps the map's center clear: no address bar; GPS / radio /
+  route-preparation indicators sit in a small corner chip, and in landscape
+  the alert and navigation panels are capped in width at the top start.
 
 ---
 
@@ -147,6 +155,10 @@ and routing:
 - 3D models of the Man (on the 2026 "Cryptomeria" tower), the Temple
   ("Temple of the Moon") and Center Camp's Canopy.
 - Home always shown; favorites marked with their names.
+- Our own car is a blocky 3D model, drawn larger than life (×3) so it's easy
+  to find, with a dot when zoomed out. Settings → App → *My vehicle on the
+  map*: art car (default, sized from the car profile), car, pickup truck,
+  school bus or golf cart.
 
 ---
 

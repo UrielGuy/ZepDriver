@@ -34,6 +34,11 @@ import java.util.concurrent.atomic.AtomicInteger
  * Voice priority: ALARM > WARNING > navigation > ADVISORY. Tones play even
  * when voice is turned off in [AppPrefs]. Everything goes to the media stream
  * with transient ducking focus so it plays through the car's speakers.
+ *
+ * Repeats are timed by the wall clock. Under the simulator's time warp alerts
+ * come and go faster than they can be said, so then at most one tone per
+ * [WARP_TONE_GAP_MS] plays and only the most important line is spoken, never
+ * queued behind another.
  */
 class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
     private val app = context.applicationContext
@@ -70,6 +75,7 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
     private val seen = HashMap<String, Seen>()
     private var lastAlarmSound = 0L
     private var lastChime = 0L
+    private var lastTone = 0L
     private var lastNavSpeech: String? = null
     private var lastNavSpeechAt = 0L
 
@@ -89,8 +95,11 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
         ttsReady = true
     }
 
-    /** Call once per drive update with the new state and the navigation prompt, if any. */
-    fun update(state: DriveState, navSpeech: String?, now: Long = System.currentTimeMillis()) {
+    /**
+     * Call once per drive update with the new state and the navigation prompt,
+     * if any. [warp] > 1 while the simulator runs time faster.
+     */
+    fun update(state: DriveState, navSpeech: String?, now: Long = System.currentTimeMillis(), warp: Int = 1) {
         val speech = ArrayList<Utterance>()
         val active = state.alerts.associateBy { it.key }
         seen.keys.retainAll(active.keys)
@@ -140,22 +149,40 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
             lastNavSpeechAt = now
         }
 
+        // Time warp: don't stack tones, vibrations and speech faster than they play.
+        val warped = warp > 1
+        if (warped && now - lastTone < WARP_TONE_GAP_MS) {
+            playSiren = false
+            playBeeps = false
+            playChime = false
+            vibration = null
+        }
+
         // One sound per update: the most severe wins.
         when {
-            playSiren -> { lastAlarmSound = now; playTone(Tones.siren) }
-            playBeeps -> playTone(Tones.beeps)
-            playChime && now - lastChime > 2_000 -> { lastChime = now; playTone(Tones.chime) }
+            playSiren -> { lastAlarmSound = now; lastTone = now; playTone(Tones.siren) }
+            playBeeps -> { lastTone = now; playTone(Tones.beeps) }
+            playChime && now - lastChime > 2_000 -> { lastChime = now; lastTone = now; playTone(Tones.chime) }
         }
         vibration?.let { vibrate(it) }
-        speak(speech)
+        speak(speech, warped)
     }
 
     private fun Alert.speechOrTitle(): String? = speech ?: title.takeIf { it.isNotBlank() }
 
-    private fun speak(utterances: List<Utterance>) {
+    private fun speak(utterances: List<Utterance>, warped: Boolean = false) {
         if (utterances.isEmpty() || !ttsReady || !prefs.value.voiceEnabled) return
         val ordered = utterances.sortedByDescending { it.priority }
         val urgent = ordered.first().priority >= 3
+        if (warped) {
+            // Only the most important line, and only alarms cut in.
+            val u = ordered.first()
+            if (u.priority < 4 && tts.isSpeaking) return
+            acquireFocus()
+            val result = tts.speak(u.text, TextToSpeech.QUEUE_FLUSH, null, "zep-${utteranceSeq++}")
+            if (result != TextToSpeech.SUCCESS) releaseFocus()
+            return
+        }
         for ((i, u) in ordered.take(3).withIndex()) {
             // Advisories are dropped rather than queued behind something more important.
             if (u.priority <= 1 && (urgent || tts.isSpeaking)) continue
@@ -217,6 +244,8 @@ class AlertPlayer(context: Context, private val prefs: StateFlow<AppPrefs>) {
         const val ALARM_REPEAT_MS = 2_000L
         const val ALARM_SPEECH_MS = 10_000L
         const val WARNING_REPEAT_MS = 8_000L
+        /** Under time warp: at least this long between tones. */
+        const val WARP_TONE_GAP_MS = 2_500L
         val WARNING_VIBRATION = longArrayOf(0, 180, 120, 180, 120, 180)
         val ALARM_VIBRATION = longArrayOf(0, 500, 150, 500, 150, 500)
     }
