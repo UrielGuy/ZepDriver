@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import java.security.MessageDigest
@@ -163,7 +164,7 @@ abstract class BundleFirmwareTask : DefaultTask() {
         val inflater = Inflater(true)
         val start = 30 + nameLen + u16(28)
         inflater.setInput(bytes, start, bytes.size - start)
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteArrayOutputStream()
         val buf = ByteArray(64 * 1024)
         while (!inflater.finished()) {
             val n = inflater.inflate(buf)
