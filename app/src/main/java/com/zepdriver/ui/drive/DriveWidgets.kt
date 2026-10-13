@@ -1,5 +1,6 @@
 package com.zepdriver.ui.drive
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +31,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +48,7 @@ import com.zepdriver.core.geo.FEET_PER_METER
 import com.zepdriver.core.geo.Fix
 import com.zepdriver.core.nav.Destination
 import com.zepdriver.core.nav.NavState
+import com.zepdriver.core.nav.ToiletPointer
 import com.zepdriver.ui.common.Fmt
 import com.zepdriver.ui.theme.Zep
 
@@ -300,9 +304,18 @@ private fun StatusDot(color: Color, text: String) {
     }
 }
 
-/** The one control that works in every mode. */
+/**
+ * The one control that works in every mode. With a [pointer] it also shows an
+ * arrow (rotated by [arrowRotationDeg] from screen-up) and the distance to the
+ * nearest porta-potties.
+ */
 @Composable
-fun PottiesButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun PottiesButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    pointer: ToiletPointer? = null,
+    arrowRotationDeg: Float = 0f,
+) {
     val c = Zep.colors
     Button(
         onClick = onClick,
@@ -312,9 +325,38 @@ fun PottiesButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier.height(84.dp).widthIn(min = 150.dp),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
     ) {
-        Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(30.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Potties", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+        if (pointer == null) {
+            Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(30.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Potties", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+        } else {
+            DirectionArrow(arrowRotationDeg, c.onPotties, Modifier.size(36.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Potties", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 26.sp)
+                Text(
+                    Fmt.distance(pointer.distanceFt),
+                    style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
+                )
+            }
+        }
+    }
+}
+
+/** A solid arrowhead pointing up, rotated clockwise by [rotationDeg]. */
+@Composable
+private fun DirectionArrow(rotationDeg: Float, color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.rotate(rotationDeg)) {
+        val w = size.width
+        val h = size.height
+        val arrow = Path().apply {
+            moveTo(w / 2, 0f)
+            lineTo(w, h)
+            lineTo(w / 2, h * 0.72f)
+            lineTo(0f, h)
+            close()
+        }
+        drawPath(arrow, color)
     }
 }
 

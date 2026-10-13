@@ -113,6 +113,12 @@ private fun AppSection(vm: MainViewModel) {
 
         SectionTitle("Map")
         SwitchRow(
+            title = "Potty arrow",
+            subtitle = "Always point to the nearest porta-potties, with the distance.",
+            checked = prefs.showPottyArrow,
+            onChange = { vm.updatePrefs(vm.prefs.value.copy(showPottyArrow = it)) },
+        )
+        SwitchRow(
             title = "Show my trail",
             subtitle = "Only on this phone; never sent to other cars.",
             checked = prefs.showTrail,

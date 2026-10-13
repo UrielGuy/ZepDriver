@@ -55,6 +55,8 @@ data class AppPrefs(
     val showTrail: Boolean = true,
     /** How far back the trail goes. */
     val trailHours: Int = 6,
+    /** Always show an arrow + distance to the nearest porta-potties on the driving view. */
+    val showPottyArrow: Boolean = true,
     /** Map tilt for the 3D view while driving, degrees. */
     val mapPitchDeg: Double = 55.0,
 )

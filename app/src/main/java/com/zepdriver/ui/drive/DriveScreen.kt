@@ -16,8 +16,11 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -25,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zepdriver.DriveUiState
 import com.zepdriver.PlayaBundle
 import com.zepdriver.core.alerts.AlertLevel
+import com.zepdriver.core.nav.ToiletFinder
 import com.zepdriver.ui.MainViewModel
 import com.zepdriver.ui.common.rememberFlash
 import com.zepdriver.ui.common.rememberNow
@@ -106,6 +110,17 @@ fun DriveScreen(
         focusKey = focus?.seq ?: 0L,
     )
 
+    // --- Potty arrow --------------------------------------------------------------------
+    // Screen-up is the vehicle heading while following, else the overview's 12:00-up.
+    var lastHeading by remember { mutableStateOf(data.layout.twelveOClockBearingDeg) }
+    val heading = fix?.bearingDeg
+    SideEffect { if (locked && heading != null) lastHeading = heading }
+    val screenUp = if (locked) lastHeading else data.layout.twelveOClockBearingDeg
+    val toiletFinder = remember(data) { ToiletFinder(data) }
+    val potty = remember(fix?.position, prefs.showPottyArrow) {
+        if (prefs.showPottyArrow) fix?.position?.let(toiletFinder::nearest) else null
+    }
+
     // --- Alerts -------------------------------------------------------------------------
     val speedLevel = drive?.speedLevel ?: AlertLevel.NONE
     val topAlert = drive?.alerts?.firstOrNull()
@@ -145,7 +160,11 @@ fun DriveScreen(
                         }
                         Spacer(Modifier.height(12.dp))
                     }
-                    PottiesButton(onClick = vm::goToPotties)
+                    PottiesButton(
+                        onClick = vm::goToPotties,
+                        pointer = potty,
+                        arrowRotationDeg = potty?.let { (it.bearingDeg - screenUp).toFloat() } ?: 0f,
+                    )
                 }
                 Spacer(Modifier.width(0.dp))
             }
