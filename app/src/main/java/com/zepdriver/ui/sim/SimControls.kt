@@ -84,8 +84,8 @@ private fun SimPad(sim: SimulatorController, state: SimState, modifier: Modifier
                 overflow = TextOverflow.Ellipsis,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HoldButton("◀", "Steer left", onPress = { sim.steer(-STEER_DEG_PER_SEC) }, onRelease = { sim.steer(0.0) })
-                HoldButton("▶", "Steer right", onPress = { sim.steer(STEER_DEG_PER_SEC) }, onRelease = { sim.steer(0.0) })
+                HoldButton("◀\uFE0E", "Steer left", onPress = { sim.steer(-STEER_DEG_PER_SEC) }, onRelease = { sim.steer(0.0) })
+                HoldButton("▶\uFE0E", "Steer right", onPress = { sim.steer(STEER_DEG_PER_SEC) }, onRelease = { sim.steer(0.0) })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 PadButton("−", "Slower") { sim.changeSpeed(-SPEED_STEP_MPH) }
