@@ -14,6 +14,9 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /** Creates the platform singletons and publishes them through [AppGraph]. */
 class ZepApp : Application() {
@@ -34,7 +37,14 @@ class ZepApp : Application() {
         super.onCreate()
         val settings = SettingsStoreImpl(this)
         val playa = PlayaRepositoryImpl(this, appScope)
-        val trips = TripLogImpl(this)
+        val trips = TripLogImpl(this, settings.prefs)
+        // Apply the retention setting at start (and whenever it changes).
+        appScope.launch(Dispatchers.IO) {
+            settings.prefs.map { it.tripKeepDays }.distinctUntilChanged().collect { trips.prune(it) }
+        }
+        appScope.launch(Dispatchers.IO) {
+            settings.prefs.map { it.tripCloudBackup }.distinctUntilChanged().collect { trips.setCloudBackup(it) }
+        }
         val mesh = MeshControllerImpl(this, appScope, settings)
         val engine = DriveEngine(appScope, playa, settings, trips, mesh)
         meshController = mesh

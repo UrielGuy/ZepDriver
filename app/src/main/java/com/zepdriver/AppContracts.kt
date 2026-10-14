@@ -57,6 +57,19 @@ data class AppPrefs(
     /** The first-run "install an offline voice" prompt has been answered. */
     val voicePromptSeen: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.AUTO,
+    /**
+     * Record our own track to the on-phone trip log. Off: nothing is ever
+     * written (and there's no trail). The log never leaves the phone except
+     * through an export the driver starts, and is excluded from cloud backup.
+     */
+    val recordTrips: Boolean = true,
+    /** Delete logged points older than this many days; 0 keeps them until cleared. */
+    val tripKeepDays: Int = 0,
+    /**
+     * Include the trip log in Android's backup to the driver's Google account.
+     * Off (default): it lives in the no-backup folder and never leaves the phone.
+     */
+    val tripCloudBackup: Boolean = false,
     /** Show our own car's trail on the map. Never sent over the mesh. */
     val showTrail: Boolean = true,
     /** How far back the trail goes. */

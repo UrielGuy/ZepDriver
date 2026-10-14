@@ -255,7 +255,16 @@ and routing:
 - Records the GPS track, speeds and warning events while driving.
 - Export as **KML** (opens in Google Earth, importable into Google My Maps)
   and **GPX**, via the Android share sheet.
-- Stored on the device only; deletable.
+- **Privacy, set up ahead of time:**
+  - Recording can be turned off entirely; then nothing is written.
+  - Retention: keep trips 1 day, 1 week, 1 month, or until deleted. Older
+    points are deleted automatically.
+  - Backup is the driver's choice: by default the log stays on the phone
+    (Android's no-backup folder, never in a cloud backup). Opting in moves it
+    to the regular database folder, which Android backs up to the driver's
+    Google account.
+  - The log is never sent over the mesh or to any server. It can be deleted
+    at any time.
 - **Own trail on the map:** optionally show our own car's path over the
   last N hours or days (configurable window). Drawn from the local log only.
 

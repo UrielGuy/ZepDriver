@@ -95,8 +95,10 @@ internal fun TripSection(vm: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         SectionTitle("Trip log")
+        TripPrivacy(vm)
         Text(
-            "Your own track, speeds and warnings, stored only on this phone.",
+            "Your own track, speeds and warnings, stored on this phone: never sent over the mesh or by the app " +
+                "over the internet. It only leaves the phone through an export, or your Google backup if you choose it.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -176,3 +178,46 @@ internal fun TripSection(vm: MainViewModel) {
         )
     }
 }
+
+/** Whether to record at all, and how long to keep what's recorded. */
+@Composable
+private fun TripPrivacy(vm: MainViewModel) {
+    val prefs by vm.prefs.collectAsStateWithLifecycle()
+    SwitchRow(
+        title = "Record my trips",
+        subtitle = if (prefs.recordTrips) "Needed for your trail on the map and for exports."
+        else "Off: nothing is recorded, and there's no trail on the map.",
+        checked = prefs.recordTrips,
+        onChange = { vm.updatePrefs(vm.prefs.value.copy(recordTrips = it)) },
+    )
+    if (prefs.recordTrips) {
+        Text("Back up", style = MaterialTheme.typography.bodyMedium)
+        RadioRow(
+            title = "Only on this phone",
+            subtitle = "Never copied anywhere. Lost if the phone is lost or reset.",
+            selected = !prefs.tripCloudBackup,
+            onClick = { vm.updatePrefs(vm.prefs.value.copy(tripCloudBackup = false)) },
+        )
+        RadioRow(
+            title = "Back up to my Google account",
+            subtitle = "Included in Android's own encrypted backup, restored on a new phone.",
+            selected = prefs.tripCloudBackup,
+            onClick = { vm.updatePrefs(vm.prefs.value.copy(tripCloudBackup = true)) },
+        )
+        Text("Keep trips for", style = MaterialTheme.typography.bodyMedium)
+        for ((days, label) in KEEP_CHOICES) {
+            RadioRow(
+                title = label,
+                selected = prefs.tripKeepDays == days,
+                onClick = { vm.updatePrefs(vm.prefs.value.copy(tripKeepDays = days)) },
+            )
+        }
+    }
+}
+
+private val KEEP_CHOICES = listOf(
+    1 to "1 day",
+    7 to "1 week",
+    30 to "1 month",
+    0 to "Until I delete them",
+)
