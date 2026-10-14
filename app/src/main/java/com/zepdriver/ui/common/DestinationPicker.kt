@@ -51,7 +51,7 @@ fun DestinationPickerDialog(
                     onValueChange = { query = it },
                     singleLine = true,
                     placeholder = { Text("Camp name or \"7:30 & E\"") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusOnShow(),
                 )
                 Column(
                     Modifier

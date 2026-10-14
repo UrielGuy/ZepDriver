@@ -7,9 +7,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.zepdriver.core.nav.DestinationKind
@@ -24,6 +30,22 @@ fun rememberNow(periodMillis: Long = 15_000L): State<Long> =
             value = System.currentTimeMillis()
         }
     }
+
+/**
+ * For a text field: focuses it and opens the keyboard when it first appears,
+ * so the user can start typing right away.
+ */
+@Composable
+fun Modifier.focusOnShow(): Modifier {
+    val requester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        withFrameNanos { } // after the first layout (and, in a dialog, once its window is up)
+        requester.requestFocus()
+        keyboard?.show()
+    }
+    return focusRequester(requester)
+}
 
 /** Toggles twice a second while [active] (alarm flashing); false otherwise. */
 @Composable

@@ -35,6 +35,7 @@ import com.zepdriver.ui.MainViewModel
 import com.zepdriver.ui.common.DestinationSheet
 import com.zepdriver.ui.common.EmptyHint
 import com.zepdriver.ui.common.Fmt
+import com.zepdriver.ui.common.focusOnShow
 
 /** Offline search over camps, art, places and BRC addresses. */
 @Composable
@@ -61,7 +62,7 @@ fun SearchScreen(vm: MainViewModel) {
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(12.dp).focusOnShow(),
         )
         if (searching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
