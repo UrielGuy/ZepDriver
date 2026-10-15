@@ -7,6 +7,7 @@ before the release dates the locations are Burning Man's confidential
 information.
 
 Usage: ZEP_BM_API_KEY=... fetch_api.py --year 2027 --out build/api/2027
+       ZEP_BM_API_KEY=... fetch_api.py --year 2026 --count-only   (key check)
 
 Writes camp.json and art.json in the API's own format (what
 build_playa_data.py reads). Exit codes: 0 done, 3 the year has no location
@@ -49,8 +50,11 @@ def get(kind, year, key):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--year", type=int, required=True)
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out")
+    ap.add_argument("--count-only", action="store_true", help="print counts, write nothing")
     a = ap.parse_args()
+    if not a.count_only and not a.out:
+        ap.error("--out is required")
     key = os.environ.get("ZEP_BM_API_KEY", "").strip()
     if not key:
         sys.exit("ZEP_BM_API_KEY is not set")
@@ -60,6 +64,8 @@ def main():
     placed_camps = sum(1 for c in camps if c.get("location_string"))
     placed_art = sum(1 for x in art if (x.get("location") or {}).get("gps_latitude") is not None)
     print(f"{a.year}: {len(camps)} camps ({placed_camps} placed), {len(art)} art ({placed_art} placed)")
+    if a.count_only:
+        return
     if placed_camps == 0:
         print(f"No {a.year} placement data yet; nothing to seal.")
         sys.exit(3)

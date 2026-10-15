@@ -38,7 +38,18 @@ run_or_skip() {
   return $rc
 }
 
-run_or_skip python3 "$ROOT/tools/data/fetch_api.py" --year "$YEAR" --out "$WORK/api"
+set +e
+python3 "$ROOT/tools/data/fetch_api.py" --year "$YEAR" --out "$WORK/api"
+rc=$?
+set -e
+if [ $rc -eq 3 ]; then
+  # Nothing to seal yet; show the key works against last year's data (counts only).
+  python3 "$ROOT/tools/data/fetch_api.py" --year "$((YEAR - 1))" --count-only
+  echo "API key OK. Building without $YEAR data for now."
+  exit 0
+elif [ $rc -ne 0 ]; then
+  exit $rc
+fi
 git clone --depth 1 -q https://github.com/burningmantech/innovate-GIS-data "$WORK/gis"
 run_or_skip python3 "$ROOT/tools/data/build_playa_data.py" --gis "$WORK/gis" --api "$WORK/api" \
   --year "$YEAR" --out "$WORK/bundle" --source "Burning Man Public API" --geocode-later
