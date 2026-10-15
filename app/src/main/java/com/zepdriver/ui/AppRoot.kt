@@ -73,6 +73,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zepdriver.DriveUiState
 import com.zepdriver.PlayaBundle
+import com.zepdriver.core.embargo.Naughty
+import com.zepdriver.ui.common.BM_DISCLAIMER
+import com.zepdriver.ui.common.NaughtyDialog
 import com.zepdriver.ui.drive.DriveScreen
 import com.zepdriver.ui.favorites.FavoritesScreen
 import com.zepdriver.ui.fleet.FleetScreen
@@ -80,6 +83,7 @@ import com.zepdriver.ui.route.RouteScreen
 import com.zepdriver.ui.search.SearchScreen
 import com.zepdriver.ui.settings.SettingsScreen
 import com.zepdriver.ui.theme.ZepTheme
+import kotlin.reflect.KClass
 import com.zepdriver.ui.theme.rememberNightMode
 
 @Composable
@@ -135,6 +139,17 @@ private fun MainScaffold(vm: MainViewModel, bundle: PlayaBundle, ui: DriveUiStat
             confirmButton = { TextButton(onClick = vm::installVoice) { Text("Install voice") } },
             dismissButton = { TextButton(onClick = vm::markVoicePromptSeen) { Text("Not now") } },
         )
+    }
+
+    // Caught cheating on the location embargo. Not while driving: the hidden
+    // places are enough until the car stops.
+    val embargo by vm.embargo.collectAsStateWithLifecycle()
+    val timeSource by vm.timeSource.collectAsStateWithLifecycle()
+    var naughtyDismissed by remember { mutableStateOf<KClass<out Naughty>?>(null) }
+    embargo.naughty?.let { n ->
+        if (!locked && naughtyDismissed != n::class) {
+            NaughtyDialog(n, timeSource) { naughtyDismissed = n::class }
+        }
     }
 
     // Moving: only the driving view, and that's where we are when the car stops.
@@ -218,7 +233,19 @@ private fun LoadingScreen() {
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 16.dp),
         )
+        Disclaimer()
     }
+}
+
+@Composable
+private fun Disclaimer() {
+    Text(
+        BM_DISCLAIMER,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(top = 24.dp),
+    )
 }
 
 // --- Location permission -----------------------------------------------------------------
@@ -290,6 +317,7 @@ private fun LocationGate(onGranted: () -> Unit, content: @Composable () -> Unit)
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Open app settings") }
             TextButton(onClick = { skipped = true }) { Text("Continue without GPS (planning only)") }
+            Disclaimer()
         }
     }
 }

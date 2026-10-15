@@ -2,6 +2,8 @@ package com.zepdriver
 
 import android.app.Application
 import android.util.Log
+import com.zepdriver.data.EmbargoControllerImpl
+import com.zepdriver.data.Net
 import com.zepdriver.data.PlayaRepositoryImpl
 import com.zepdriver.data.SettingsStoreImpl
 import com.zepdriver.data.TripLogImpl
@@ -33,10 +35,16 @@ class ZepApp : Application() {
     lateinit var meshController: MeshControllerImpl
         private set
 
+    lateinit var embargo: EmbargoControllerImpl
+        private set
+
     override fun onCreate() {
         super.onCreate()
         val settings = SettingsStoreImpl(this)
-        val playa = PlayaRepositoryImpl(this, appScope)
+        val embargo = EmbargoControllerImpl(this, appScope)
+        Net.onServerTime = embargo::onServerTime
+        this.embargo = embargo
+        val playa = PlayaRepositoryImpl(this, appScope, embargo)
         val trips = TripLogImpl(this, settings.prefs)
         // Apply the retention setting at start (and whenever it changes).
         appScope.launch(Dispatchers.IO) {
@@ -52,6 +60,7 @@ class ZepApp : Application() {
 
         AppGraph.settings = settings
         AppGraph.playa = playa
+        AppGraph.embargo = embargo
         AppGraph.trips = trips
         AppGraph.mesh = mesh
         AppGraph.drive = DriveControllerImpl(this, engine)
@@ -59,6 +68,7 @@ class ZepApp : Application() {
         AppGraph.sim = SimulatorControllerImpl(engine, mesh, available = BuildConfig.DEBUG)
         AppGraph.voice = VoiceControllerImpl(this, appScope)
 
+        embargo.start()
         playa.start()
         mesh.start()
     }

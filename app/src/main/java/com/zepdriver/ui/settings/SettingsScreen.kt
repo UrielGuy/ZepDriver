@@ -35,6 +35,8 @@ import com.zepdriver.core.rules.ZoneKind
 import com.zepdriver.core.vehicles.VehicleModel
 import com.zepdriver.ui.MainViewModel
 import com.zepdriver.ui.SettingsSection
+import com.zepdriver.ui.common.BM_DISCLAIMER
+import com.zepdriver.ui.common.EmbargoStatusText
 import com.zepdriver.ui.common.Fmt
 import com.zepdriver.ui.common.SectionTitle
 import kotlin.math.roundToInt
@@ -180,6 +182,8 @@ private fun AppSection(vm: MainViewModel) {
 @Composable
 private fun DataSection(vm: MainViewModel, bundle: PlayaBundle) {
     val status by vm.updateStatus.collectAsStateWithLifecycle()
+    val embargo by vm.embargo.collectAsStateWithLifecycle()
+    val timeSource by vm.timeSource.collectAsStateWithLifecycle()
     val data = bundle.data
     Column(
         Modifier
@@ -195,6 +199,7 @@ private fun DataSection(vm: MainViewModel, bundle: PlayaBundle) {
             "${data.camps.size} camps · ${data.art.size} art pieces · ${data.toilets.size} potty banks",
             style = MaterialTheme.typography.bodyMedium,
         )
+        EmbargoStatusText(embargo, timeSource)
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
         Button(onClick = vm::checkForUpdate, modifier = Modifier.fillMaxWidth()) { Text("Check for update") }
         Text(
@@ -203,6 +208,7 @@ private fun DataSection(vm: MainViewModel, bundle: PlayaBundle) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(data.layout.attribution, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(BM_DISCLAIMER, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

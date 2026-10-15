@@ -3,6 +3,7 @@ package com.zepdriver.data
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.SystemClock
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -13,6 +14,12 @@ import java.security.MessageDigest
 internal object Net {
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 30_000
+
+    /**
+     * Receives the Date of every HTTPS response (real UTC millis) with the
+     * monotonic time it arrived; one of the embargo's trusted time sources.
+     */
+    @Volatile var onServerTime: ((utcMillis: Long, elapsedMillis: Long) -> Unit)? = null
 
     /** True if the system reports a network with internet capability. */
     fun isOnline(context: Context): Boolean {
@@ -30,6 +37,8 @@ internal object Net {
         conn.useCaches = false
         conn.setRequestProperty("User-Agent", "ZepDriver")
         val code = conn.responseCode
+        val date = conn.date
+        if (date > 0 && conn.url.protocol == "https") onServerTime?.invoke(date, SystemClock.elapsedRealtime())
         if (code != HttpURLConnection.HTTP_OK) {
             conn.disconnect()
             throw IOException("HTTP $code for $url")

@@ -12,6 +12,8 @@ import com.zepdriver.MeshUiState
 import com.zepdriver.PlayaBundle
 import com.zepdriver.SimulatorController
 import com.zepdriver.TripDay
+import com.zepdriver.core.embargo.EmbargoState
+import com.zepdriver.core.embargo.TimeSource
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.mesh.FleetVehicle
 import com.zepdriver.core.mesh.MeshText
@@ -75,6 +77,8 @@ class MainViewModel : ViewModel() {
     val messages: StateFlow<List<MeshText>> = AppGraph.mesh.messages
     val profile: StateFlow<VehicleProfile> = AppGraph.settings.profile
     val voice: StateFlow<VoiceState> = AppGraph.voice.state
+    val embargo: StateFlow<EmbargoState> = AppGraph.embargo.state
+    val timeSource: StateFlow<TimeSource?> = AppGraph.embargo.timeSource
     val prefs: StateFlow<AppPrefs> = AppGraph.settings.prefs
     val favorites: StateFlow<List<Favorite>> = AppGraph.settings.favorites
     /** Playa simulator (debug builds only; see [SimulatorController.available]). */

@@ -3,6 +3,8 @@ package com.zepdriver
 import android.net.Uri
 import com.zepdriver.core.brc.BrcAddressing
 import com.zepdriver.core.data.PlayaData
+import com.zepdriver.core.embargo.EmbargoState
+import com.zepdriver.core.embargo.TimeSource
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.mesh.FleetVehicle
 import com.zepdriver.core.mesh.MeshText
@@ -250,6 +252,16 @@ interface VoiceController {
 }
 
 /** Service locator, initialised by [ZepApp.onCreate]. */
+/**
+ * Burning Man's location embargo for the new year's data: what may be shown
+ * now, and whether someone is cheating.
+ */
+interface EmbargoController {
+    val state: StateFlow<EmbargoState>
+    /** Where real time was last confirmed from (satellites, network, server), if at all yet. */
+    val timeSource: StateFlow<TimeSource?>
+}
+
 object AppGraph {
     lateinit var playa: PlayaRepository
     lateinit var settings: SettingsStore
@@ -258,4 +270,5 @@ object AppGraph {
     lateinit var trips: TripLog
     lateinit var sim: SimulatorController
     lateinit var voice: VoiceController
+    lateinit var embargo: EmbargoController
 }

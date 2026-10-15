@@ -3,18 +3,23 @@
 
 Inputs:
   --gis    path to a checkout of github.com/burningmantech/innovate-GIS-data
-  --api    path to a directory holding the Public API dumps (art.json, camp.json)
-           e.g. iBurn-Data/data/<year>/APIData/APIData.bundle
-  --extra  path to iBurn-Data/data/<year>/geo (for the Man and Center Camp plaza polygons)
-  --year   event year
-  --out    output directory (app/src/main/assets/playa/<year>)
+  --api    path to a directory holding the Public API dumps (art.json, camp.json):
+           tools/data/fetch_api.py output, or iBurn-Data/data/<year>/APIData/APIData.bundle
+  --extra  optional: iBurn-Data/data/<year>/geo (for the Great Circle polygon;
+           without it the app uses a circle of the coded radius)
+  --year   event year; must be set up in YEARS below (annual review)
+  --out    output directory
+  --geocode-later  keep camps that have an address but no coordinates (the
+           API gives camps addresses only); the sealing step geocodes them
 
 Personal contact fields (emails, phone numbers) are dropped.
+Exit code 3: the year isn't set up in YEARS yet, or its GIS data isn't out.
 """
 import argparse
 import hashlib
 import json
 import os
+import sys
 
 ROUND = 6  # ~0.1 m
 
@@ -64,15 +69,37 @@ RINGS_2026 = [
 ]
 
 
+# Per-year city facts from that year's BRC Measurements and event dates.
+# Add the new year here in the annual review (SPEC.md §13).
+YEARS = {
+    2026: {
+        "rings": RINGS_2026,
+        "eventStart": "2026-08-30",
+        "eventEnd": "2026-09-07",
+        "manBurn": "2026-09-05",
+        "templeBurn": "2026-09-06",
+    },
+}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--gis", required=True)
     ap.add_argument("--api", required=True)
-    ap.add_argument("--extra", required=True)
+    ap.add_argument("--extra")
     ap.add_argument("--year", type=int, default=2026)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--source", default="Burning Man Public API via iBurn-Data")
+    ap.add_argument("--geocode-later", action="store_true")
     a = ap.parse_args()
+    year = YEARS.get(a.year)
+    if year is None:
+        print(f"{a.year} isn't set up in build_playa_data.py YEARS yet (annual review).")
+        sys.exit(3)
     gis = os.path.join(a.gis, str(a.year), "GeoJSON")
+    if not os.path.isdir(gis):
+        print(f"No {a.year} GIS data in {a.gis} yet.")
+        sys.exit(3)
     out = a.out
 
     # --- Layout -------------------------------------------------------------
@@ -86,7 +113,7 @@ def main():
         "temple": {"lat": round(temple[1], ROUND), "lon": round(temple[0], ROUND)},
         # Compass bearing (degrees true) of the 12:00 direction from the Man.
         "twelveOClockBearingDeg": 45.0,
-        "rings": [{"letter": l, "name": n, "radiusFt": r, "widthFt": w} for l, n, r, w in RINGS_2026],
+        "rings": [{"letter": l, "name": n, "radiusFt": r, "widthFt": w} for l, n, r, w in year["rings"]],
         "cityStartClock": "2:00",
         "cityEndClock": "10:00",
         "radialWidthFt": 40,
@@ -94,12 +121,12 @@ def main():
         "greatCircleRadiusFt": 200,
         "walkInCamping": {"fromClock": "2:00", "toClock": "5:00"},
         "timeZone": "America/Los_Angeles",
-        "eventStart": "2026-08-30",
-        "eventEnd": "2026-09-07",
-        "manBurn": "2026-09-05",
-        "templeBurn": "2026-09-06",
+        "eventStart": year["eventStart"],
+        "eventEnd": year["eventEnd"],
+        "manBurn": year["manBurn"],
+        "templeBurn": year["templeBurn"],
         "attribution": "Map data: Burning Man Project GIS (innovate.burningman.org). "
-                       "Art and camp data: Burning Man Public API via iBurn-Data.",
+                       f"Art and camp data: {a.source}.",
     }
     write(out, "layout.json", layout)
 
@@ -122,10 +149,11 @@ def main():
 
     plazas = [feature(f["geometry"], {"name": f["properties"].get("name")})
               for f in load(os.path.join(gis, "plazas.geojson"))["features"]]
-    # The Man's Great Circle comes from iBurn's derived polygons.
-    for f in load(os.path.join(a.extra, "polygons.geojson"))["features"]:
-        if f["properties"].get("name") == "The Man Plaza":
-            plazas.append(feature(f["geometry"], {"name": "Great Circle"}))
+    # The Man's Great Circle comes from iBurn's derived polygons, when available.
+    if a.extra:
+        for f in load(os.path.join(a.extra, "polygons.geojson"))["features"]:
+            if f["properties"].get("name") == "The Man Plaza":
+                plazas.append(feature(f["geometry"], {"name": "Great Circle"}))
     write(out, "geo/plazas.geojson", fc(plazas))
 
     toilets = [feature(f["geometry"], {"class": f["properties"].get("class") or "outer"})
@@ -154,14 +182,16 @@ def main():
     camps = []
     for x in load(os.path.join(a.api, "camp.json")):
         loc = x.get("location") or {}
-        if loc.get("gps_latitude") is None:
+        has_gps = loc.get("gps_latitude") is not None
+        if not has_gps and not (a.geocode_later and x.get("location_string")):
             continue
         camps.append({
             "id": x["uid"], "name": x["name"], "hometown": x.get("hometown"),
             "description": x.get("description"), "landmark": x.get("landmark"),
             "address": x.get("location_string"), "frontage": loc.get("frontage"),
             "intersection": loc.get("intersection"),
-            "lat": round(loc["gps_latitude"], ROUND), "lon": round(loc["gps_longitude"], ROUND),
+            "lat": round(loc["gps_latitude"], ROUND) if has_gps else None,
+            "lon": round(loc["gps_longitude"], ROUND) if has_gps else None,
         })
     write(out, "art.json", art)
     write(out, "camps.json", camps)

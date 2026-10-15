@@ -127,4 +127,11 @@ class PlayaData(
 
     fun xy(p: LatLon) = projection.toXy(p)
     fun latLon(p: Xy) = projection.toLatLon(p)
+
+    /** The same city with its camps and/or art left out (embargoed or withheld). */
+    fun withPlaces(camps: Boolean, art: Boolean): PlayaData = PlayaData(
+        layout, dataVersion, streets, blocks, plazas, toilets, fence, dmz, pois,
+        art = if (art) this.art else emptyList(),
+        camps = if (camps) this.camps else emptyList(),
+    )
 }

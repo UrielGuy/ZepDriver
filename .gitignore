@@ -8,3 +8,4 @@ captures/
 .kotlin/
 .claude/worktrees/
 app/src/main/assets/speech/
+__pycache__/

@@ -134,7 +134,52 @@ and routing:
 - **GIS data** (innovate.burningman.org, no key): street centerlines and
   outlines, plazas, trash fence, toilets, points of interest.
 - **Burning Man Public API** (key required): camps and art with locations.
-  Fetched **at build time** and bundled. The API key never ships in the app.
+  Fetched **at build time** in CI and bundled. The key lives only in the
+  `BURNING_MAN_API_KEY` GitHub Actions secret; it is never committed, logged
+  or shipped. The API gives camps an address only, so camp positions are
+  geocoded from it (the street corner, plaza spot or portal it names).
+- **Previous years** (public): last year's full bundle is committed in
+  `app/src/main/assets/playa/<year>/`.
+
+### 6.1a Location embargo
+
+Per the Terms of Service for Burning Man APIs and Datasets, developers get
+the new year's locations three weeks before the event, and until release
+they are Burning Man's confidential information:
+
+| Until | The app shows |
+|---|---|
+| Camp release: 12:01 am Sunday of the week before the event | Last year's city, camps and art |
+| Art release: when the Gate opens on the first day | The new year's map and camps, **no art** |
+| After that | Everything for the new year |
+
+- Dates are coded per year (`core/embargo/DataRelease.kt`), never read
+  from data files.
+- **Sealed in the APK:** the new year's `camps.json` and `art.json` are
+  gzipped and AES-256-GCM encrypted at build time; they are never in the repo
+  or in CI logs (counts only). The data key is derived from the API key and
+  stored only masked with the signing certificate's hash, so a re-signed
+  copy can't open it. GCM makes any changed byte fail to open.
+- **Real time, not the phone's clock:** release dates are checked against
+  GNSS time from real (non-mock) GPS fixes, the system's network time, and
+  the Date of our HTTPS responses, carried forward on the monotonic clock.
+  The latest confirmed time is saved (HMAC'd, never backed up), so an unlock
+  survives restarts without signal. With no confirmed time yet, the app
+  waits rather than trusting the phone's clock.
+- **Tampering → "Naughty!":** a phone clock set past a release date that
+  real time hasn't reached (beyond 10 minutes' slack), an APK signed by
+  someone else, or changed sealed data or saved state hides **all** camps
+  and art, including last year's, and says why. The map, speed and zone
+  warnings keep working: hiding them would make driving less safe. The
+  message isn't shown while moving.
+- Limit, stated plainly: anything inside an app can be dug out by a
+  determined reverse engineer; this stops changing the clock, unzipping
+  the APK and editing files. (iBurn, the main open-source playa app, ships
+  plaintext locations and hides them in the UI.)
+- Required disclaimer, shown on the first screens and in Settings: "This app
+  is not affiliated, endorsed, or verified by Burning Man Project."
+- No art means no art buffer in routing either; art cars don't drive the
+  city before the gates open.
 
 ### 6.2 Updates
 
@@ -143,6 +188,8 @@ and routing:
   (WorkManager). Each file is verified against the manifest's SHA-256 and
   swapped in atomically; the last good bundle is kept as a fallback.
 - Bundle signing is a later improvement; V1 relies on HTTPS + checksums.
+- Updates only ever replace the public (previous-year) bundle. The
+  embargoed year ships inside the APK; placement changes ship as app updates.
 
 ### 6.3 Search and favorites
 
@@ -287,8 +334,16 @@ and routing:
    burningman.org. Update the coded ruleset (zone types, cross-only
    roads, no-entry areas, time windows, speed limit) and bump its version.
 2. Pull the new year's GIS data and re-generate map tiles and zone geometry.
-3. Re-fetch camps and art from the Public API (once locations are
-   released) and publish a new data bundle.
+3. Set up the new year for the sealed data (§6.1a):
+   - Check the API terms for the release rules and code the year's dates
+     in `core/embargo/DataRelease.kt`.
+   - Add the year's street names and event dates to `YEARS` in
+     `tools/data/build_playa_data.py`.
+   - Set the year in the "Seal the embargoed year's data" CI step.
+   - Check the `BURNING_MAN_API_KEY` secret still works (the CI step logs
+     camp and art counts).
+4. After the burn, when the year's data is public, commit it as the new
+   previous-year bundle.
 
 ---
 
@@ -315,6 +370,8 @@ and routing:
 
 ## 16. Open questions
 
-- Burning Man API key access and permission to bundle camp/art data
+- Ask Burning Man whether sealed-in-APK data before the release dates is
+  acceptable to them, or whether they'd rather locations arrive in an app
+  update after release
 - Which license types and limitations to support in the profile
 - Hosting for the update manifest and data bundles

@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import com.zepdriver.AppGraph
 import com.zepdriver.DriveUiState
 import com.zepdriver.ZepApp
+import com.zepdriver.data.EmbargoControllerImpl
 import com.zepdriver.core.geo.Fix
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.rules.DrivingMode
@@ -53,9 +54,13 @@ class DriveService : Service() {
     private var locationActive = false
     private var lastNotificationText: String? = null
     private var lastNotificationAt = 0L
+    private var embargo: EmbargoControllerImpl? = null
 
     private val listener = object : LocationListener {
-        override fun onLocationChanged(location: Location) = engine.onFix(location.toFix())
+        override fun onLocationChanged(location: Location) {
+            embargo?.onLocation(location)
+            engine.onFix(location.toFix())
+        }
         // Implemented explicitly: these have no default implementation before API 30.
         @Deprecated("Deprecated in Java")
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
@@ -68,6 +73,7 @@ class DriveService : Service() {
     override fun onCreate() {
         super.onCreate()
         engine = (application as ZepApp).driveEngine
+        embargo = (application as ZepApp).embargo
         createChannel()
         scope.launch { engine.state.collect { if (foreground) updateNotification(it) } }
     }

@@ -21,6 +21,8 @@ An Android app for Burning Man Mutant Vehicle (art car) drivers:
 
 See [SPEC.md](SPEC.md) for the full product spec.
 
+*This app is not affiliated, endorsed, or verified by Burning Man Project.*
+
 ## Install (testers)
 
 On your Android phone, open
@@ -55,8 +57,19 @@ log. The simulator is always off when the app starts.
 
 ## Data
 
-The app bundles one year's data in `app/src/main/assets/playa/<year>/`. To
-regenerate it:
+The app bundles last year's public data in `app/src/main/assets/playa/<year>/`.
+The upcoming year's camps and art come from the Burning Man API at build
+time and are sealed into the APK, following Burning Man's location embargo
+(SPEC.md §6.1a). They are never committed.
+
+**API key:** add it as a repository secret named `BURNING_MAN_API_KEY`
+(GitHub → Settings → Secrets and variables → Actions → New repository
+secret). CI passes it only to `tools/data/build_sealed.sh`. Without it,
+builds simply ship last year's data. For a Play Store release, add the
+Play App Signing certificate's SHA-256 as the repository variable
+`ZEP_EXTRA_CERTS` so release builds can open the sealed data.
+
+To regenerate last year's public bundle:
 
 ```sh
 git clone https://github.com/burningmantech/innovate-GIS-data

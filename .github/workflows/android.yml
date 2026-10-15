@@ -40,6 +40,14 @@ jobs:
           curl -sSfL --retry 3 -o build/tts/voice.onnx.json "$VOICE/en_US-ljspeech-high.onnx.json"
           python3 tools/speech/generate_clips.py --phrases core/build/speech/phrases.json \
             --piper build/tts/piper/piper --model build/tts/voice.onnx --out app/src/main/assets/speech
+      - name: Seal the embargoed year's data (Burning Man API)
+        # The API key lives only in the BURNING_MAN_API_KEY secret. Locations
+        # stay sealed in the APK until their release dates; nothing but counts
+        # is logged, and nothing is committed.
+        env:
+          ZEP_BM_API_KEY: ${{ secrets.BURNING_MAN_API_KEY }}
+          ZEP_EXTRA_CERTS: ${{ vars.ZEP_EXTRA_CERTS }}
+        run: tools/data/build_sealed.sh 2027
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
       - name: Upload APK

@@ -72,6 +72,10 @@ android {
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/versions/9/previous-compilation-data.bin")
     }
 
+    // The embargoed year's sealed camp and art data, built in CI from the
+    // Burning Man API (tools/data/build_sealed.sh). Never committed.
+    sourceSets.getByName("main").assets.srcDir(File(rootProject.layout.buildDirectory.get().asFile, "sealed-assets"))
+
     // Keep GeoJSON bundles uncompressed so MapLibre can read them quickly.
     androidResources {
         noCompress += listOf("geojson", "pbf", "ogg")

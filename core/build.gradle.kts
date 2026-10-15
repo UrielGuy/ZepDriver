@@ -36,3 +36,13 @@ tasks.register<JavaExec>("speechCatalog") {
         layout.buildDirectory.file("speech/phrases.json").get().asFile.absolutePath,
     )
 }
+
+// Seals an embargoed year's camp and art data into APK assets (see SealMain and
+// tools/data/build_sealed.sh). Needs ZEP_BM_API_KEY in the environment.
+//   -PsealIn=<bundle dir> -PsealOut=<assets dir> -PsealCerts=<cert>[,<cert>...]
+tasks.register<JavaExec>("sealData") {
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.zepdriver.core.embargo.SealMainKt")
+    val certs = (findProperty("sealCerts") as String?)?.split(",")?.filter { it.isNotBlank() }.orEmpty()
+    args(listOfNotNull(findProperty("sealIn") as String?, findProperty("sealOut") as String?) + certs)
+}

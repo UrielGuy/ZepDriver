@@ -8,6 +8,7 @@ import com.zepdriver.PlayaRepository
 import com.zepdriver.core.brc.BrcAddressing
 import com.zepdriver.core.data.PlayaData
 import com.zepdriver.core.data.PlayaDataLoader
+import com.zepdriver.core.embargo.DataAccess
 import com.zepdriver.core.rules.ruleSetFor
 import com.zepdriver.core.search.SearchIndex
 import kotlinx.coroutines.CoroutineScope
@@ -15,6 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,6 +31,12 @@ import java.io.IOException
  * Loads the playa data bundle (built-in assets or the newest verified
  * download) and keeps it up to date from [BuildConfig.DATA_BASE_URL].
  *
+ * What is shown follows the location embargo ([EmbargoControllerImpl]): the
+ * previous year's city (this public bundle) until the new year's camps are
+ * released, then the new year's sealed bundle with camps but no art, then
+ * everything. Caught tampering shows no camps or art at all. Updates only
+ * ever touch the public bundle; the sealed year ships inside the APK.
+ *
  * Downloads live in `filesDir/playa/<year>/<version>/`; a version directory
  * only counts once its `.complete` marker exists, which is written after every
  * file's SHA-256 matched the manifest and the bundle parsed. Directories are
@@ -37,6 +46,7 @@ import java.io.IOException
 class PlayaRepositoryImpl(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val embargo: EmbargoControllerImpl,
 ) : PlayaRepository {
 
     private val year = BuildConfig.DATA_YEAR
@@ -51,10 +61,18 @@ class PlayaRepositoryImpl(
     private val _status = MutableStateFlow("Loading data…")
     override val updateStatus: StateFlow<String> = _status.asStateFlow()
 
-    /** Version of the bundle currently loaded. */
+    /** Version of the public bundle currently loaded. */
     @Volatile private var currentVersion: String? = null
     /** Directory of the loaded download, or null for the built-in assets. */
     @Volatile private var currentDir: File? = null
+
+    /** The public (previous-year) bundle and where MapLibre reads its layers. */
+    private var publicData: PlayaData? = null
+    private var publicPrefix = ""
+    /** The sealed year, opened on first need. */
+    private var sealedData: PlayaData? = null
+    /** What's published: access level plus the data version it came from. */
+    private var published: Pair<DataAccess, String>? = null
 
     private val builtInVersion: String by lazy {
         runCatching { manifestOf(readAsset("manifest.json")).version }.getOrDefault("unknown")
@@ -74,6 +92,9 @@ class PlayaRepositoryImpl(
     fun start() {
         scope.launch(Dispatchers.IO) {
             mutex.withLock { loadBest() }
+            embargo.state.map { it.access }.distinctUntilChanged().collect {
+                mutex.withLock { publishForAccess() }
+            }
         }
         DataUpdateWorker.schedule(context)
         DataUpdateWorker.runSoon(context)
@@ -91,7 +112,7 @@ class PlayaRepositoryImpl(
      */
     suspend fun checkNow(): Boolean = withContext(Dispatchers.IO) {
         mutex.withLock {
-            if (_bundle.value == null) loadBest()
+            if (publicData == null) loadBest()
             if (!Net.isOnline(context)) {
                 _status.value = "Offline — will retry"
                 return@withLock false
@@ -134,10 +155,10 @@ class PlayaRepositoryImpl(
     /** Loads the newest complete download if valid, else the built-in assets. Caller holds [mutex]. */
     private fun loadBest() {
         for (dir in completeDownloads()) {
-            if (currentDir == dir && _bundle.value != null) return
+            if (currentDir == dir && publicData != null) return
             try {
                 val data = PlayaDataLoader.load { path -> File(dir, path).readText() }
-                publish(data, "file://${dir.absolutePath}/", dir)
+                setPublic(data, "file://${dir.absolutePath}/", dir)
                 _status.value = "Downloaded data (${short(data.dataVersion)})"
                 return
             } catch (e: Exception) {
@@ -145,10 +166,10 @@ class PlayaRepositoryImpl(
                 dir.deleteRecursively()
             }
         }
-        if (currentDir == null && _bundle.value != null) return
+        if (currentDir == null && publicData != null) return
         try {
             val data = PlayaDataLoader.load { path -> readAsset(path) }
-            publish(data, "asset://$assetDir/", null)
+            setPublic(data, "asset://$assetDir/", null)
             _status.value = "Built-in data (${data.dataVersion.take(4)}…)"
         } catch (e: Exception) {
             Log.e(TAG, "built-in bundle failed to load", e)
@@ -156,7 +177,47 @@ class PlayaRepositoryImpl(
         }
     }
 
-    private fun publish(data: PlayaData, uriPrefix: String, dir: File?) {
+    private fun setPublic(data: PlayaData, uriPrefix: String, dir: File?) {
+        publicData = data
+        publicPrefix = uriPrefix
+        currentVersion = data.dataVersion
+        currentDir = dir
+        publishForAccess()
+    }
+
+    /** Publishes what the embargo allows right now. Caller holds [mutex]. */
+    private fun publishForAccess() {
+        val access = embargo.state.value.access
+        val base = publicData ?: return
+        val (data, prefix) = when (access) {
+            DataAccess.NOTHING -> base.withPlaces(camps = false, art = false) to publicPrefix
+            DataAccess.PREVIOUS_YEAR -> base to publicPrefix
+            DataAccess.CAMPS, DataAccess.CAMPS_AND_ART -> {
+                val sealed = embargo.sealed
+                val year = sealed?.let { s ->
+                    sealedData ?: try {
+                        PlayaDataLoader.load(s::read).also { sealedData = it }
+                    } catch (e: Exception) {
+                        // Checked when the app started, so this is a changed asset: the controller
+                        // only learns of it here. Show nothing rather than last year's places.
+                        Log.e(TAG, "sealed ${s.year} data failed to open", e)
+                        null
+                    }
+                }
+                when {
+                    sealed == null || year == null -> base.withPlaces(camps = false, art = false) to publicPrefix
+                    access == DataAccess.CAMPS -> year.withPlaces(camps = true, art = false) to sealed.uriPrefix
+                    else -> year to sealed.uriPrefix
+                }
+            }
+        }
+        val key = access to "${data.layout.year}/${data.dataVersion}/${data.camps.size}/${data.art.size}"
+        if (key == published) return
+        published = key
+        publish(data, prefix)
+    }
+
+    private fun publish(data: PlayaData, uriPrefix: String) {
         val addressing = BrcAddressing(data)
         _bundle.value = PlayaBundle(
             data = data,
@@ -165,8 +226,6 @@ class PlayaRepositoryImpl(
             search = SearchIndex(data, addressing),
             uriPrefix = uriPrefix,
         )
-        currentVersion = data.dataVersion
-        currentDir = dir
     }
 
     /** Verified download directories, newest install first. Copies made for an older APK's data are dropped. */
