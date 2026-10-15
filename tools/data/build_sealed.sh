@@ -2,7 +2,7 @@
 # Builds the embargoed year's camp and art data and seals it into APK assets.
 # Runs in CI with the Burning Man API key from the BURNING_MAN_API_KEY secret.
 #
-#   ZEP_BM_API_KEY=... tools/data/build_sealed.sh <year>
+#   ZEP_BM_API_KEY=... tools/data/build_sealed.sh [year]   (default: tools/data/SEALED_YEAR)
 #
 # Output: build/sealed-assets/, which the app build picks up as assets. The
 # plaintext download is deleted afterwards, and only counts are printed: CI logs
@@ -10,14 +10,21 @@
 # Without a key, or before the year's placement data exists, it builds nothing
 # and the app ships the previous year only.
 #
+# Writes build/sealed-fingerprint.txt: a keyed hash of what was sealed, or
+# "none". CI publishes it with the APK; the daily build compares against it to
+# publish only when the data changed.
+#
 # ZEP_EXTRA_CERTS: comma-separated SHA-256s of other signing certificates
 # allowed to open the data (e.g. Play App Signing's), besides app/debug.keystore.
 set -euo pipefail
-YEAR="$1"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+YEAR="${1:-$(tr -d '[:space:]' < "$ROOT/tools/data/SEALED_YEAR")}"
 OUT="$ROOT/build/sealed-assets"
 WORK="$ROOT/build/sealed-work"
+FINGERPRINT="$ROOT/build/sealed-fingerprint.txt"
 rm -rf "$OUT" "$WORK"
+mkdir -p "$ROOT/build"
+echo none > "$FINGERPRINT"   # replaced by SealMain when something is sealed
 trap 'rm -rf "$WORK"' EXIT
 
 if [ -z "${ZEP_BM_API_KEY:-}" ]; then

@@ -1,0 +1,76 @@
+name: Daily data check
+
+# During the embargoed year's data window (a month before the gates open
+# through the event; see core/embargo/ReleaseWindowMain.kt), fetch and seal
+# the Burning Man API data every day, and rebuild + publish the app only when
+# the data differs from what the published build carries.
+#
+# GitHub disables scheduled workflows in public repos after 60 days without
+# repository activity: re-enable this one in the annual review (Actions tab →
+# Daily data check → Enable workflow).
+
+on:
+  schedule:
+    - cron: "17 13 * 7-9 *"   # daily July–September, 6:17 am in Black Rock City
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Check even outside the data window
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write   # to start the build workflow
+
+concurrency:
+  group: daily-data
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Inside the data window?
+        id: window
+        run: |
+          ./gradlew -q :core:releaseWindow | tee window.txt
+          if [ "${{ inputs.force }}" = "true" ] || [ "$(tail -n 1 window.txt)" = "open" ]; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Outside the data window; nothing to do."
+          fi
+      - name: Seal today's data (Burning Man API)
+        if: steps.window.outputs.open == 'true'
+        env:
+          ZEP_BM_API_KEY: ${{ secrets.BURNING_MAN_API_KEY }}
+          ZEP_EXTRA_CERTS: ${{ vars.ZEP_EXTRA_CERTS }}
+        run: tools/data/build_sealed.sh
+      - name: Compare with the published build
+        if: steps.window.outputs.open == 'true'
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          today=$(cat build/sealed-fingerprint.txt)
+          published=$(gh release download latest-debug -p data-fingerprint.txt -O - 2>/dev/null || echo missing)
+          echo "Published build: $published. Today's data: $today."
+          if [ "$today" != "$published" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Data unchanged; not publishing."
+          fi
+      - name: Build and publish the app
+        if: steps.compare.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run android.yml --ref "$GITHUB_REF_NAME"
+          echo "Data changed: started the build workflow."

@@ -4,6 +4,7 @@ import com.zepdriver.core.TestData
 import com.zepdriver.core.data.PlayaDataLoader
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
@@ -17,6 +18,36 @@ import kotlin.test.assertTrue
 class SealBundleTest {
     private val bundle = File(System.getProperty("zep.assets"), "playa/2026")
     private val cert = Seal.sha256("our cert".toByteArray())
+
+    @Test fun fingerprintChangesOnlyWithTheData() {
+        val tmp = Files.createTempDirectory("fp").toFile()
+        try {
+            val copy = File(tmp, "bundle").also { bundle.copyRecursively(it) }
+            val out = File(tmp, "out")
+            val first = sealBundle(copy, out, listOf(cert), apiKey = "k")
+            assertEquals(first, sealBundle(copy, out, listOf(cert), apiKey = "k"))
+            // Same records in another order: same fingerprint.
+            val camps = File(copy, "camps.json")
+            val reversed = Json.parseToJsonElement(camps.readText()).jsonArray.reversed()
+            camps.writeText(kotlinx.serialization.json.JsonArray(reversed).toString())
+            assertEquals(first, sealBundle(copy, out, listOf(cert), apiKey = "k"))
+            // One camp gone: different.
+            camps.writeText(kotlinx.serialization.json.JsonArray(reversed.drop(1)).toString())
+            assertTrue(first != sealBundle(copy, out, listOf(cert), apiKey = "k"))
+        } finally {
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test fun releaseWindowIsAMonthBeforeTheGatesThroughTheEvent() {
+        val w = releaseWindow(2027)!!
+        val gates = DataRelease.forYear(2027)!!.artAtMillis
+        assertTrue(gates - 30 * 86_400_000L in w)
+        assertTrue(gates + 8 * 86_400_000L in w)
+        assertFalse(gates - 40 * 86_400_000L in w)
+        assertFalse(gates + 20 * 86_400_000L in w)
+        assertEquals(null, releaseWindow(1999))
+    }
 
     @Test fun sealsAndOpensTheWholeBundle() {
         val out = Files.createTempDirectory("sealed").toFile()

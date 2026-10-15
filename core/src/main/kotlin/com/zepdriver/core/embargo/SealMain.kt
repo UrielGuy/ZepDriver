@@ -32,6 +32,10 @@ import kotlin.system.exitProcess
  * - <year>/meta.zsl: sealed {year, sealedAt}
  * - <year>/camps.zsl, <year>/art.zsl: the sealed camp and art files
  * - <year>/bundle/: the rest of the bundle (map layers, layout), which is public
+ *
+ * Also writes outDir/../sealed-fingerprint.txt: a keyed hash of the sealed
+ * content (not readable without the key), so CI can tell whether the data
+ * changed since the last published build.
  */
 fun main(args: Array<String>) {
     if (args.size < 3) {
@@ -40,11 +44,17 @@ fun main(args: Array<String>) {
     }
     val apiKey = System.getenv("ZEP_BM_API_KEY")?.takeIf { it.isNotBlank() }
         ?: run { System.err.println("ZEP_BM_API_KEY is not set"); exitProcess(2) }
-    sealBundle(File(args[0]), File(args[1]), args.drop(2).map(::certSha256), apiKey)
+    val out = File(args[1])
+    val fingerprint = sealBundle(File(args[0]), out, args.drop(2).map(::certSha256), apiKey)
+    File(out.absoluteFile.parentFile, "sealed-fingerprint.txt").writeText(fingerprint)
 }
 
-/** Writes [outRoot]/sealed/ from [bundle]; see the file comment for the layout. */
-fun sealBundle(bundle: File, outRoot: File, certs: List<ByteArray>, apiKey: String) {
+/**
+ * Writes [outRoot]/sealed/ from [bundle]; see the file comment for the layout.
+ * Returns the content fingerprint: the same data always gives the same one,
+ * whatever order the API listed it in.
+ */
+fun sealBundle(bundle: File, outRoot: File, certs: List<ByteArray>, apiKey: String): String {
     require(certs.isNotEmpty()) { "no signing certificates" }
     val out = File(outRoot, "sealed")
     val layout = Json.parseToJsonElement(File(bundle, "layout.json").readText()).jsonObject
@@ -77,6 +87,24 @@ fun sealBundle(bundle: File, outRoot: File, certs: List<ByteArray>, apiKey: Stri
     val index = JsonObject(mapOf("year" to JsonPrimitive(year), "keys" to JsonObject(keys)))
     File(out, "index.json").writeText(index.toString())
     println("sealed $year for ${certs.size} signing certificate(s) into $out")
+    return fingerprint(key, year, contents, bundle)
+}
+
+/** Keyed hash of the sealed records (order-independent) plus the public map files. */
+private fun fingerprint(key: ByteArray, year: Int, contents: Map<String, String>, bundle: File): String {
+    val canonical = buildString {
+        append(year)
+        for ((name, text) in contents.toSortedMap()) {
+            append('\n').append(name)
+            Json.parseToJsonElement(text).jsonArray.map { it.toString() }.sorted().forEach { append('\n').append(it) }
+        }
+        bundle.walkTopDown().filter { it.isFile }
+            .map { it.relativeTo(bundle).invariantSeparatorsPath to it }
+            .filter { (rel, _) -> rel !in DataRelease.SEALED_FILES && rel != "manifest.json" }
+            .sortedBy { it.first }
+            .forEach { (rel, f) -> append('\n').append(rel).append('\n').append(f.readText()) }
+    }
+    return Seal.hex(Seal.mac(key, canonical.toByteArray())).take(16)
 }
 
 /** Fills in coordinates for camps that only have an address; drops the ones that can't be placed. */

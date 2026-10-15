@@ -69,6 +69,10 @@ builds simply ship last year's data. For a Play Store release, add the
 Play App Signing certificate's SHA-256 as the repository variable
 `ZEP_EXTRA_CERTS` so release builds can open the sealed data.
 
+From a month before the gates open through the event, the "Daily data
+check" workflow fetches the API data every morning and publishes a new build
+only if the data changed. It can also be run by hand from the Actions tab.
+
 To regenerate last year's public bundle:
 
 ```sh

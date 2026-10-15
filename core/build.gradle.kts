@@ -46,3 +46,11 @@ tasks.register<JavaExec>("sealData") {
     val certs = (findProperty("sealCerts") as String?)?.split(",")?.filter { it.isNotBlank() }.orEmpty()
     args(listOfNotNull(findProperty("sealIn") as String?, findProperty("sealOut") as String?) + certs)
 }
+
+// Exits 0 inside the embargoed year's data window (daily-data workflow gate).
+//   -Pyear=<year>, default tools/data/SEALED_YEAR
+tasks.register<JavaExec>("releaseWindow") {
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.zepdriver.core.embargo.ReleaseWindowMainKt")
+    args((findProperty("year") as String?) ?: rootProject.file("tools/data/SEALED_YEAR").readText().trim())
+}

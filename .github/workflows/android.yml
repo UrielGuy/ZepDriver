@@ -47,7 +47,7 @@ jobs:
         env:
           ZEP_BM_API_KEY: ${{ secrets.BURNING_MAN_API_KEY }}
           ZEP_EXTRA_CERTS: ${{ vars.ZEP_EXTRA_CERTS }}
-        run: tools/data/build_sealed.sh 2027
+        run: tools/data/build_sealed.sh
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
       - name: Upload APK
@@ -61,8 +61,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk zepdriver-debug.apk
+          # Which sealed data this build carries (a keyed hash); the daily data
+          # check compares against it.
+          cp build/sealed-fingerprint.txt data-fingerprint.txt 2>/dev/null || echo none > data-fingerprint.txt
           gh release delete latest-debug --yes --cleanup-tag || true
-          gh release create latest-debug zepdriver-debug.apk \
+          gh release create latest-debug zepdriver-debug.apk data-fingerprint.txt \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "ZepDriver — latest test build (#${GITHUB_RUN_NUMBER})" \

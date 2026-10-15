@@ -190,6 +190,10 @@ they are Burning Man's confidential information:
 - Bundle signing is a later improvement; V1 relies on HTTPS + checksums.
 - Updates only ever replace the public (previous-year) bundle. The
   embargoed year ships inside the APK; placement changes ship as app updates.
+- **Daily data build:** from a month before the gates open through the event,
+  a scheduled CI job fetches and seals the API data every day and compares a
+  keyed fingerprint of it with the one published alongside the current APK.
+  Only when the data changed does it rebuild and publish the app.
 
 ### 6.3 Search and favorites
 
@@ -339,7 +343,10 @@ they are Burning Man's confidential information:
      in `core/embargo/DataRelease.kt`.
    - Add the year's street names and event dates to `YEARS` in
      `tools/data/build_playa_data.py`.
-   - Set the year in the "Seal the embargoed year's data" CI step.
+   - Set the year in `tools/data/SEALED_YEAR` (used by CI and the daily
+     data build).
+   - Re-enable the "Daily data check" workflow (Actions tab): GitHub turns
+     scheduled workflows off after 60 days without repository activity.
    - Check the `BURNING_MAN_API_KEY` secret still works (the CI step logs
      camp and art counts).
 4. After the burn, when the year's data is public, commit it as the new
