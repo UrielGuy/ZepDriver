@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Test builds install next to the Play Store version; tell them apart. -->
+    <string name="app_name">ZepDriver Test</string>
+</resources>

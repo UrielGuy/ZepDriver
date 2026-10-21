@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      play:
+        description: Also upload this build to Google Play (internal testing)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -55,23 +60,50 @@ jobs:
         with:
           name: zepdriver-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - name: Build release bundle (for Google Play)
+        # Signed with the upload key when its secrets are set; unsigned otherwise.
+        env:
+          ZEP_UPLOAD_KEYSTORE_B64: ${{ secrets.ZEP_UPLOAD_KEYSTORE_B64 }}
+          ZEP_UPLOAD_KEY_PASSWORD: ${{ secrets.ZEP_UPLOAD_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ZEP_UPLOAD_KEYSTORE_B64" ]; then
+            export ZEP_UPLOAD_KEYSTORE="$RUNNER_TEMP/upload.p12"
+            printf '%s' "$ZEP_UPLOAD_KEYSTORE_B64" | base64 -d > "$ZEP_UPLOAD_KEYSTORE"
+          else
+            echo "No upload key secrets: the bundle is unsigned and can't go to Play."
+          fi
+          ./gradlew :app:bundleRelease --stacktrace
+          rm -f "$RUNNER_TEMP/upload.p12"
+      - name: Upload to Google Play (internal testing)
+        if: inputs.play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.zepdriver
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
       - name: Publish install link (latest-debug pre-release)
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk zepdriver-debug.apk
+          # The Play bundle, for uploading by hand in Play Console.
+          cp app/build/outputs/bundle/release/app-release.aab zepdriver-release.aab
           # Which sealed data this build carries (a keyed hash); the daily data
           # check compares against it.
           cp build/sealed-fingerprint.txt data-fingerprint.txt 2>/dev/null || echo none > data-fingerprint.txt
           gh release delete latest-debug --yes --cleanup-tag || true
-          gh release create latest-debug zepdriver-debug.apk data-fingerprint.txt \
+          gh release create latest-debug zepdriver-debug.apk zepdriver-release.aab data-fingerprint.txt \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "ZepDriver — latest test build (#${GITHUB_RUN_NUMBER})" \
             --notes "Debug build ${GITHUB_RUN_NUMBER} from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}.
 
-          On your Android phone, tap **zepdriver-debug.apk** below to download, then open it to install (allow installing from your browser if asked). Newer builds install over older ones and keep your settings."
+          On your Android phone, tap **zepdriver-debug.apk** below to download, then open it to install (allow installing from your browser if asked). It installs as \"ZepDriver Test\", next to the Play Store version; newer test builds install over older ones and keep your settings.
+
+          **zepdriver-release.aab** is the Google Play bundle (signed with the upload key) for uploading in Play Console."
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4

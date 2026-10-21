@@ -14,12 +14,13 @@ plugins {
 
 android {
     namespace = "com.zepdriver"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.zepdriver"
         minSdk = 26
-        targetSdk = 35
+        // Google Play requires API 36 for new apps and updates from Aug 31, 2026.
+        targetSdk = 36
         // CI run number keeps every build installable as an update of the last one.
         val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionCode = build
@@ -47,14 +48,32 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // Play upload key: CI decodes the ZEP_UPLOAD_KEYSTORE_B64 secret to a file
+        // and passes its path and password in the environment. Google re-signs
+        // what Play delivers with the app signing key it holds (Play App Signing).
+        val uploadStore = System.getenv("ZEP_UPLOAD_KEYSTORE")?.takeIf { file(it).isFile }
+        val uploadPassword = System.getenv("ZEP_UPLOAD_KEY_PASSWORD")
+        if (uploadStore != null && uploadPassword != null) {
+            create("upload") {
+                storeFile = file(uploadStore)
+                storeType = "PKCS12"
+                storePassword = uploadPassword
+                keyAlias = "upload"
+                keyPassword = uploadPassword
+            }
+        }
     }
 
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("debug")
+            // Installs next to the Play Store version instead of clashing with it.
+            applicationIdSuffix = ".debug"
         }
         release {
             isMinifyEnabled = false
+            // Unsigned when the upload key isn't available (local builds, forks).
+            signingConfig = signingConfigs.findByName("upload")
         }
     }
 

@@ -31,6 +31,25 @@ and install it. If Android asks, allow installing apps from your browser.
 That link always points at the newest build, and each new build installs as
 an update that keeps your settings.
 
+## Google Play
+
+CI builds a release bundle (`bundleRelease`) on every push, signed with the
+Play upload key when its secrets are set, and attaches it to the
+`latest-debug` release as `zepdriver-release.aab`. Test builds install as
+"ZepDriver Test" (`com.zepdriver.debug`), next to the Play version.
+
+- **Uploading:** run the "Android CI" workflow by hand with "Also upload to
+  Google Play" ticked to send that build to the internal testing track. The
+  daily data check does the same on its own when the data changed. Promote
+  to closed testing or production in Play Console.
+- **Secrets:** `ZEP_UPLOAD_KEYSTORE_B64` and `ZEP_UPLOAD_KEY_PASSWORD` (upload
+  key), `PLAY_SERVICE_ACCOUNT_JSON` (Play Developer API access). Variable
+  `ZEP_EXTRA_CERTS`: the Play App Signing certificate's SHA-256, so Play
+  installs can open the sealed data.
+- Store listing draft: [store/listing.md](store/listing.md). Play Console
+  form answers: [store/play-console-answers.md](store/play-console-answers.md).
+  Privacy policy: [PRIVACY.md](PRIVACY.md).
+
 ## Building
 
 ```sh
