@@ -67,10 +67,11 @@ location).
   > notification.
 
 - Video: [videos/foreground-service-location.mp4](assets/videos/foreground-service-location.mp4)
-  (upload it to YouTube as **Unlisted** and paste the link). It shows a
-  route being driven, the app going to the background, the notification
-  updating with speed, destination and ETA, and the app coming back with
-  the drive continued.
+  (75 s; upload it to YouTube as **Unlisted** and paste the link). It shows
+  the car driving with live speed and the potty arrow, the app going to the
+  background, the notification updating the car's speed and position
+  (4:45 @ 2,450 ft, then 4:50 and 4:55 & Esplanade), and the app coming back
+  with the car further along and the "Driving on Esplanade" warning up.
 
 ## Other declarations
 News app: No · Health: No · Financial features: No · Government app: No ·
