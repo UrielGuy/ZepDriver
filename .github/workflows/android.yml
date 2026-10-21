@@ -91,6 +91,11 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk zepdriver-debug.apk
           # The Play bundle, for uploading by hand in Play Console.
           cp app/build/outputs/bundle/release/app-release.aab zepdriver-release.aab
+          if unzip -l zepdriver-release.aab | grep -qE 'META-INF/[^/]+\.(RSA|EC|DSA)$'; then
+            SIGNED="signed with the upload key"
+          else
+            SIGNED="UNSIGNED, add the upload key secrets first"
+          fi
           # Which sealed data this build carries (a keyed hash); the daily data
           # check compares against it.
           cp build/sealed-fingerprint.txt data-fingerprint.txt 2>/dev/null || echo none > data-fingerprint.txt
@@ -103,7 +108,7 @@ jobs:
 
           On your Android phone, tap **zepdriver-debug.apk** below to download, then open it to install (allow installing from your browser if asked). It installs as \"ZepDriver Test\", next to the Play Store version; newer test builds install over older ones and keep your settings.
 
-          **zepdriver-release.aab** is the Google Play bundle (signed with the upload key) for uploading in Play Console."
+          **zepdriver-release.aab** is the Google Play bundle for uploading in Play Console: ${SIGNED}."
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
