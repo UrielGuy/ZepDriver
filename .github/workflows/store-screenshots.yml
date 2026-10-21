@@ -3,7 +3,8 @@ name: Store screenshots
 # Run by hand (Actions tab). Builds the test app, runs it on an Android
 # emulator through the debug-only screenshot scenes (ui/ScreenshotScenes.kt,
 # tools/store/screenshots.sh) and commits the Play Store phone screenshots to
-# store/assets/screenshots/. 1080 × 1920 (16:9), as Play wants.
+# store/assets/screenshots/ (1080 × 1920, 16:9, as Play wants), plus the
+# foreground service video Play asks for (store/assets/videos/).
 
 on:
   workflow_dispatch:
@@ -38,17 +39,19 @@ jobs:
           profile: pixel_2
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: tools/store/screenshots.sh app/build/outputs/apk/debug/app-debug.apk store/assets/screenshots
+          script: VIDEO=store/assets/videos tools/store/screenshots.sh app/build/outputs/apk/debug/app-debug.apk store/assets/screenshots
       - name: Keep them as a download too
         uses: actions/upload-artifact@v4
         with:
           name: store-screenshots
-          path: store/assets/screenshots/
+          path: |
+            store/assets/screenshots/
+            store/assets/videos/
       - name: Commit the screenshots
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add store/assets/screenshots
+          git add store/assets/screenshots store/assets/videos
           if git diff --cached --quiet; then echo "No changes."; exit 0; fi
           git commit -m "Store screenshots from the emulator (run ${GITHUB_RUN_NUMBER})"
           git push

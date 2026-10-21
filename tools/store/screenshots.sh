@@ -3,7 +3,7 @@
 # .github/workflows/store-screenshots.yml). Each scene is set up by the debug
 # build's ScreenshotScenes (simulated car, debug controls hidden).
 #
-#   tools/store/screenshots.sh <app-debug.apk> <out-dir>
+#   [VIDEO=<dir>] tools/store/screenshots.sh <app-debug.apk> <out-dir>
 set -euo pipefail
 APK="$1"
 OUT="$2"
@@ -24,13 +24,40 @@ adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 
 adb shell am broadcast -a com.android.systemui.demo -e command network -e mobile show -e level 4 -e datatype none >/dev/null
 adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
 
+start_scene() {
+  adb shell am force-stop "$PKG"
+  adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" --es zep.screenshot "$1" >/dev/null
+}
+
 n=1
 for scene in map warning route search fleet night; do
-  adb shell am force-stop "$PKG"
-  adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" --es zep.screenshot "$scene" >/dev/null
-  sleep 35
+  start_scene "$scene"
+  # Routes wait for the router to build its grid, which is slow on an emulator.
+  if [ "$scene" = route ]; then sleep 150; else sleep 40; fi
   adb exec-out screencap -p > "$OUT/$(printf '%02d' $n)-$scene.png"
   echo "captured $scene"
   n=$((n + 1))
 done
+
+# The foreground service video for Play's declaration: navigating, then the
+# app goes to the background and keeps working (status in the notification),
+# then back to the app.
+if [ -n "${VIDEO:-}" ]; then
+  start_scene video
+  sleep 150   # route planned and the car driving
+  adb shell screenrecord --time-limit 75 --bit-rate 6000000 /sdcard/fgs.mp4 &
+  REC=$!
+  sleep 15                                              # navigating in the app
+  adb shell input keyevent KEYCODE_HOME; sleep 8        # app in the background
+  adb shell cmd statusbar expand-notifications; sleep 12  # the service keeps navigating
+  adb shell cmd statusbar collapse; sleep 12
+  adb shell cmd statusbar expand-notifications; sleep 10  # progress since
+  adb shell cmd statusbar collapse; sleep 2
+  adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" >/dev/null   # back in the app
+  wait $REC || true
+  sleep 3
+  mkdir -p "$VIDEO"
+  adb pull /sdcard/fgs.mp4 "$VIDEO/foreground-service-location.mp4"
+  echo "recorded the foreground service video"
+fi
 adb shell am broadcast -a com.android.systemui.demo -e command exit >/dev/null

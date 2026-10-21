@@ -13,7 +13,6 @@ import android.content.pm.ServiceInfo
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Build
 import android.os.Bundle
 import android.os.HandlerThread
 import android.os.IBinder
@@ -37,6 +36,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.ceil
 
 /**
  * Foreground service that keeps driving features alive with the screen off:
@@ -111,11 +111,10 @@ class DriveService : Service() {
     }
 
     private fun goForeground(): Boolean {
-        var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-        // On API 34+ the connectedDevice type needs a Bluetooth runtime permission.
-        val btGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            granted(Manifest.permission.BLUETOOTH_CONNECT)
-        if (btGranted) types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        // A location service: live warnings, navigation and sharing the car's
+        // position with the fleet. The radio's Bluetooth link serves that
+        // location sharing and runs while this service keeps the app going.
+        val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
         return try {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification("Starting…"), types)
             foreground = true
@@ -202,11 +201,14 @@ class DriveService : Service() {
 
     private fun updateNotification(state: DriveUiState) {
         val drive = state.drive
+        // Navigating: where to and how long; otherwise where we are.
+        val where = state.nav?.takeIf { !it.finished }?.let { nav ->
+            state.stops.firstOrNull()?.let { " · to ${it.name}, ${ceil(nav.minutesToStop()).toInt()} min" }
+        } ?: drive?.address?.let { " · $it" } ?: ""
         val text = when {
             drive == null -> "Waiting for GPS"
-            drive.mode == DrivingMode.MOVING ->
-                String.format(Locale.US, "%.1f mph", drive.speedMph) + (drive.address?.let { " · $it" } ?: "")
-            else -> "Parked" + (drive.address?.let { " · $it" } ?: "")
+            drive.mode == DrivingMode.MOVING -> String.format(Locale.US, "%.1f mph", drive.speedMph) + where
+            else -> "Parked$where"
         }
         val now = System.currentTimeMillis()
         if (text == lastNotificationText || now - lastNotificationAt < 5_000) return

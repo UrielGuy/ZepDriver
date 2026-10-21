@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Debug builds only: sets up a scene for the Play Store screenshots, driven by
@@ -61,7 +62,8 @@ object ScreenshotScenes {
                 delay(1_500)
                 sim.changeSpeed(7.5)
             }
-            "route" -> {
+            // "video": the same drive, recorded for Play's foreground service declaration.
+            "route", "video" -> {
                 sim.setStart(SimStart.OPEN_PLAYA)
                 delay(3_000)
                 val data = bundle.data
@@ -69,7 +71,8 @@ object ScreenshotScenes {
                 val camp = data.camps.indices.minByOrNull { data.campXy[it].distanceTo(target) } ?: return
                 val c = data.camps[camp]
                 vm.goNow(Destination(c.name, c.position, DestinationKind.CAMP, refId = c.id, address = c.address))
-                delay(2_000)
+                // Planning waits for the router's grid, which takes a while on an emulator.
+                withTimeoutOrNull(150_000) { vm.drive.first { it.nav != null } }
                 sim.setMode(SimMode.AUTOPILOT)
             }
             "search" -> {

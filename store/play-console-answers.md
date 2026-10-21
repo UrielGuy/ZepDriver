@@ -50,14 +50,27 @@ Not collected: the trip log, settings and favorites stay on the phone
 No, the app doesn't use an advertising ID.
 
 ## Foreground service permissions
-- **Location** (`FOREGROUND_SERVICE_LOCATION`): "Live speed and restricted-zone
-  warnings and turn-by-turn navigation while driving an art car, which keep
-  running with the screen off or another app open."
-- **Connected device** (`FOREGROUND_SERVICE_CONNECTED_DEVICE`): "Keeps the
-  Bluetooth link to the driver's Meshtastic LoRa radio open while driving, to
-  share the car's position with other cars and receive their messages."
-- Video: a 30-second screen recording of a test build: start driving in the
-  simulator, show a zone warning, lock the screen, show the notification.
+The app declares only `FOREGROUND_SERVICE_LOCATION` (the Bluetooth radio link
+runs inside the same location service, since it exists to share the car's
+location).
+
+- Tasks: **Navigation** and **User-initiated location sharing**
+- Description:
+
+  > ZepDriver is a driving co-pilot for art car drivers at Black Rock City.
+  > While the driver has started driving, a foreground service with an
+  > ongoing notification uses GPS to give spoken speed and restricted-area
+  > warnings and turn-by-turn navigation, which must keep working with the
+  > screen off or another app in front. If the driver has connected a LoRa
+  > radio, the same service shares the car's position with other cars in
+  > their fleet. The service stops when the driver taps Stop in the
+  > notification.
+
+- Video: [videos/foreground-service-location.mp4](assets/videos/foreground-service-location.mp4)
+  (upload it to YouTube as **Unlisted** and paste the link). It shows a
+  route being driven, the app going to the background, the notification
+  updating with speed, destination and ETA, and the app coming back with
+  the drive continued.
 
 ## Other declarations
 News app: No · Health: No · Financial features: No · Government app: No ·

@@ -1,5 +1,6 @@
 package com.zepdriver.ui.map
 
+import android.animation.ValueAnimator
 import android.content.ComponentCallbacks
 import android.content.res.Configuration
 import android.graphics.RectF
@@ -321,7 +322,12 @@ private class PlayaMapController(private val density: Float) {
             pendingCamera = pos
             return
         }
-        m.easeCamera(CameraUpdateFactory.newCameraPosition(pos), durationMs)
+        // With Android's "Remove animations" setting an eased move never lands; jump instead.
+        if (ValueAnimator.areAnimatorsEnabled()) {
+            m.easeCamera(CameraUpdateFactory.newCameraPosition(pos), durationMs)
+        } else {
+            m.moveCamera(CameraUpdateFactory.newCameraPosition(pos))
+        }
     }
 
     fun release() {
