@@ -37,5 +37,6 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) vm.onUsbAttached()
+        ScreenshotScenes.handle(intent, vm)
     }
 }

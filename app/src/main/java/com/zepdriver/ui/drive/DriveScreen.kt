@@ -177,9 +177,10 @@ fun DriveScreen(
     val alarm = speedLevel == AlertLevel.ALARM || topAlert?.level == AlertLevel.ALARM
     val flashOn = rememberFlash(alarm)
     val debugUnlocked by vm.debugUnlocked.collectAsStateWithLifecycle()
+    val screenshotMode by vm.screenshotMode.collectAsStateWithLifecycle()
     val statusRow: @Composable (Modifier) -> Unit = { m ->
         Row(m, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (vm.sim.available) DebugLockToggle(unlocked = debugUnlocked, onClick = vm::toggleDebugUnlock)
+            if (vm.sim.available && !screenshotMode) DebugLockToggle(unlocked = debugUnlocked, onClick = vm::toggleDebugUnlock)
             StatusChip(fix, mesh, fleet.size, ui.routerBusy)
         }
     }
@@ -315,7 +316,7 @@ fun DriveScreen(
         if (alarm) AlarmBorder(flashOn)
 
         // Playa simulator pad (debug builds; nothing unless it's on): left edge, mid-height.
-        SimOverlay(
+        if (!screenshotMode) SimOverlay(
             vm.sim,
             Modifier
                 .align(Alignment.CenterStart)

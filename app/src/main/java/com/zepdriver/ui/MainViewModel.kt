@@ -92,6 +92,14 @@ class MainViewModel : ViewModel() {
         if (sim.available) _debugUnlocked.update { !it }
     }
 
+    // Debug builds: store screenshot scenes hide the debug-only controls (see ScreenshotScenes).
+    private val _screenshotMode = MutableStateFlow(false)
+    val screenshotMode: StateFlow<Boolean> = _screenshotMode.asStateFlow()
+
+    fun setScreenshotMode(on: Boolean) {
+        if (sim.available) _screenshotMode.value = on
+    }
+
     /** The moving lock, unless overridden in a debug build. */
     private fun uiLocked(): Boolean = drive.value.isLocked() && !_debugUnlocked.value
 

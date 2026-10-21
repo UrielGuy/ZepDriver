@@ -1,0 +1,5 @@
+Category: Maps & Navigation
+Tags: Navigation, Travel & local
+Email: (your public developer contact email)
+Website: https://github.com/UrielGuy/ZepDriver
+Privacy policy: https://github.com/UrielGuy/ZepDriver/blob/HEAD/PRIVACY.md

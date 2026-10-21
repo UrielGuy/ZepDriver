@@ -46,7 +46,8 @@ Play upload key when its secrets are set, and attaches it to the
   key), `PLAY_SERVICE_ACCOUNT_JSON` (Play Developer API access). Variable
   `ZEP_EXTRA_CERTS`: the Play App Signing certificate's SHA-256, so Play
   installs can open the sealed data.
-- Store listing draft: [store/listing.md](store/listing.md). Play Console
+- Store listing texts, icon, feature graphic and screenshots:
+  [store/assets/](store/assets/). Play Console
   form answers: [store/play-console-answers.md](store/play-console-answers.md).
   Privacy policy: [PRIVACY.md](PRIVACY.md).
 

@@ -91,10 +91,8 @@ Without this, Play installs would show "Naughty!" once 2027 data arrives.
 
 ## After that
 
-1. **Store listing:** copy the texts from [listing.md](listing.md). You'll need:
-   - 2+ phone screenshots (use the simulator in "ZepDriver Test")
-   - a 512 px icon
-   - a 1024×500 feature graphic
+1. **Store listing:** everything is in [assets/](assets/): texts to paste,
+   the 512 px icon, the 1024×500 feature graphic and the phone screenshots.
 2. **App content:** fill in every section under **Policy → App content** from
    [play-console-answers.md](play-console-answers.md).
 3. **Closed testing:** run a closed track with **12+ testers for 14 days**

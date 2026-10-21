@@ -45,6 +45,8 @@ fun SearchScreen(vm: MainViewModel) {
     val searching by vm.searching.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<SearchResult?>(null) }
     val focusManager = LocalFocusManager.current
+    // Store screenshots show the results, not the keyboard.
+    val screenshotMode by vm.screenshotMode.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -62,7 +64,7 @@ fun SearchScreen(vm: MainViewModel) {
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-            modifier = Modifier.fillMaxWidth().padding(12.dp).focusOnShow(),
+            modifier = Modifier.fillMaxWidth().padding(12.dp).let { if (screenshotMode) it else it.focusOnShow() },
         )
         if (searching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 

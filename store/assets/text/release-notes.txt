@@ -1,0 +1,3 @@
+<en-US>
+First release: speed and zone warnings, offline 3D map and search, rule-aware navigation with a Potties button, and an optional LoRa radio mesh for your fleet.
+</en-US>

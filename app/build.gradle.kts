@@ -35,6 +35,8 @@ android {
         // library roughly halves the APK.
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            // -Pzep.emulator adds x86_64 for the store-screenshot emulator run.
+            if (project.hasProperty("zep.emulator")) abiFilters += "x86_64"
         }
     }
 
