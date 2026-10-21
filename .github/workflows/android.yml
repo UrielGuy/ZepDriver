@@ -74,6 +74,15 @@ jobs:
           fi
           ./gradlew :app:bundleRelease --stacktrace
           rm -f "$RUNNER_TEMP/upload.p12"
+      - name: Check Google Play access
+        if: inputs.play
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_JSON" ]; then
+            echo "::error::The PLAY_SERVICE_ACCOUNT_JSON secret isn't set, so this build can't go to Google Play. Set it up (store/play-setup.md, Part 5) or upload zepdriver-release.aab by hand."
+            exit 1
+          fi
       - name: Upload to Google Play (internal testing)
         if: inputs.play
         uses: r0adkll/upload-google-play@v1
