@@ -21,6 +21,11 @@ on:
         description: "Only these screenshots, space-separated (map warning route search fleet night); empty = all"
         type: string
         default: ""
+      api:
+        description: Emulator Android version (API level)
+        type: choice
+        options: ["34", "35", "33"]
+        default: "34"
       gpu:
         # MapLibre crashed in the deprecated swiftshader_indirect bridge
         # (GL2Encoder::s_glDrawElements) and parked maps came out blank.
@@ -55,7 +60,7 @@ jobs:
         env:
           SCENES: ${{ inputs.scenes }}
         with:
-          api-level: 34
+          api-level: ${{ inputs.api }}
           target: google_apis
           arch: x86_64
           profile: pixel_2
