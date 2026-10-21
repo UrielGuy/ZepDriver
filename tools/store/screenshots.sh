@@ -26,8 +26,27 @@ adb shell am broadcast -a com.android.systemui.demo -e command notifications -e 
 
 start_scene() {
   adb shell am force-stop "$PKG"
-  adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" --es zep.screenshot "$1" >/dev/null
+  if [ -n "${2:-}" ]; then
+    adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" --es zep.screenshot "$1" --es zep.hide "$2" >/dev/null
+  else
+    adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" --es zep.screenshot "$1" >/dev/null
+  fi
 }
+
+# PROBE="<layers>;<layers>;...": the route scene once per set of map layers
+# left out, reporting whether the app survived. Takes no screenshots.
+if [ -n "${PROBE:-}" ]; then
+  IFS=';' read -ra SETS <<< "$PROBE"
+  for hide in "${SETS[@]}"; do
+    adb logcat -b crash -c || true
+    start_scene route "$hide"
+    sleep 150
+    if adb shell pidof "$PKG" >/dev/null; then verdict=alive; else verdict=CRASHED; fi
+    echo "PROBE hide=[$hide]: $verdict"
+    adb logcat -b crash -d | grep -m3 -E "Fatal signal|#00 pc|#01 pc" || true
+  done
+  exit 0
+fi
 
 # SCENES (e.g. "route") retakes some of them; the file numbers stay the same.
 ALL="map warning route search fleet night"

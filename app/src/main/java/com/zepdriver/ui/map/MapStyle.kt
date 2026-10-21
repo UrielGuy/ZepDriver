@@ -242,8 +242,9 @@ object MapStyle {
     /**
      * @param uriPrefix bundle root, e.g. "asset://playa/2026/"
      * @param latitude used to turn widths in feet into pixels per zoom level
+     * @param hidden layer ids left out (debug builds, to find what the emulator can't draw)
      */
-    fun build(uriPrefix: String, palette: MapPalette, latitude: Double): String {
+    fun build(uriPrefix: String, palette: MapPalette, latitude: Double, hidden: Set<String> = emptySet()): String {
         val p = palette
         val sources = linkedMapOf<String, Any?>()
         for (f in listOf("blocks", "streets", "plazas", "toilets", "fence", "poi")) {
@@ -560,7 +561,7 @@ object MapStyle {
             "name" to "ZepDriver",
             "glyphs" to "asset://glyphs/{fontstack}/{range}.pbf",
             "sources" to sources,
-            "layers" to layers,
+            "layers" to layers.filter { it["id"] !in hidden },
         )
         return toJson(style).toString()
     }

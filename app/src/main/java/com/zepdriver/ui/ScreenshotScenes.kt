@@ -26,6 +26,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 object ScreenshotScenes {
     const val EXTRA = "zep.screenshot"
 
+    /** Comma-separated map layer ids to leave out (tools/store/screenshots.sh PROBE). */
+    const val EXTRA_HIDE = "zep.hide"
+
     /** Scene names, in the order the store shows them. */
     val SCENES = listOf("map", "warning", "route", "search", "fleet", "night")
 
@@ -33,6 +36,7 @@ object ScreenshotScenes {
         // The simulator only exists in debug builds; release builds ignore the extra.
         if (!vm.sim.available) return
         val scene = intent?.getStringExtra(EXTRA) ?: return
+        vm.setHiddenLayers(intent?.getStringExtra(EXTRA_HIDE)?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet().orEmpty())
         vm.viewModelScope.launch { run(scene, vm) }
     }
 

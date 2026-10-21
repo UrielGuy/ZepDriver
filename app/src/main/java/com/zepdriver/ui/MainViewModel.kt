@@ -100,6 +100,14 @@ class MainViewModel : ViewModel() {
         if (sim.available) _screenshotMode.value = on
     }
 
+    // Debug builds: map layers left out, to find what the emulator's GL can't draw.
+    private val _hiddenLayers = MutableStateFlow<Set<String>>(emptySet())
+    val hiddenLayers: StateFlow<Set<String>> = _hiddenLayers.asStateFlow()
+
+    fun setHiddenLayers(ids: Set<String>) {
+        if (sim.available) _hiddenLayers.value = ids
+    }
+
     /** The moving lock, unless overridden in a debug build. */
     private fun uiLocked(): Boolean = drive.value.isLocked() && !_debugUnlocked.value
 

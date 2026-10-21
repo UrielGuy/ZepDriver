@@ -103,8 +103,9 @@ fun DriveScreen(
     val navigating = nav != null && !nav.finished
 
     // --- Map ------------------------------------------------------------------------
-    val styleJson = remember(bundle.uriPrefix, colors.map) {
-        MapStyle.build(bundle.uriPrefix, colors.map, data.layout.man.lat)
+    val hiddenLayers by vm.hiddenLayers.collectAsStateWithLifecycle()
+    val styleJson = remember(bundle.uriPrefix, colors.map, hiddenLayers) {
+        MapStyle.build(bundle.uriPrefix, colors.map, data.layout.man.lat, hiddenLayers)
     }
     val headingMemo = remember(data) { HeadingMemo(data.layout.twelveOClockBearingDeg) }
     val modelHeading = headingMemo.update(fix?.bearingDeg)

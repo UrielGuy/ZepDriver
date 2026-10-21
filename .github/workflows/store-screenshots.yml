@@ -21,6 +21,10 @@ on:
         description: "Only these screenshots, space-separated (map warning route search fleet night); empty = all"
         type: string
         default: ""
+      probe:
+        description: "Debug: route scene per set of hidden map layers, e.g. route-walk;stops,stop-numbers (no screenshots)"
+        type: string
+        default: ""
       api:
         description: Emulator Android version (API level)
         type: choice
@@ -59,6 +63,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           SCENES: ${{ inputs.scenes }}
+          PROBE: ${{ inputs.probe }}
         with:
           api-level: ${{ inputs.api }}
           target: google_apis
