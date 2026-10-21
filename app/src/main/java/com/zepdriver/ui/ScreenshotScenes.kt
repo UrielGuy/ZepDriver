@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.lifecycle.viewModelScope
 import com.zepdriver.AppGraph
 import com.zepdriver.ThemeMode
+import com.zepdriver.core.geo.Xy
 import com.zepdriver.core.nav.Destination
 import com.zepdriver.core.nav.DestinationKind
 import com.zepdriver.core.sim.SimMode
@@ -82,7 +83,32 @@ object ScreenshotScenes {
                 delay(1_500)
                 sim.changeSpeed(4.5)
             }
+            // A planned multi-stop route. (Navigating crashes MapLibre in the emulator's
+            // GL encoder, GL2Encoder::s_glDrawElements; see "navigate".)
             "route" -> {
+                sim.setStart(SimStart.OPEN_PLAYA)
+                delay(3_000)
+                val data = bundle.data
+                fun campNear(address: String): Destination? {
+                    val target = data.xy(bundle.addressing.parse(address) ?: return null)
+                    val c = data.camps.indices.minByOrNull { data.campXy[it].distanceTo(target) }?.let { data.camps[it] } ?: return null
+                    return Destination(c.name, c.position, DestinationKind.CAMP, refId = c.id, address = c.address)
+                }
+                val first = campNear("7:30 & E")
+                val last = campNear("4:30 & C")
+                // An art piece on the open playa, halfway out from the Man (the projection's origin).
+                val halfway = first?.let { data.projection.toXy(it.position) }?.let { Xy(it.x / 2, it.y / 2) }
+                val art = halfway?.let { h -> data.art.indices.minByOrNull { data.artXy[it].distanceTo(h) } }?.let { data.art[it] }
+                vm.clearStops()
+                listOfNotNull(
+                    first,
+                    art?.let { Destination(it.name, it.position, DestinationKind.ART, refId = it.id, address = it.address) },
+                    last,
+                ).forEach(vm::addStop)
+                vm.setTab(Tab.ROUTE)
+            }
+            // Debug only (tools/store/screenshots.sh PROBE): navigating to a camp.
+            "navigate" -> {
                 sim.setStart(SimStart.OPEN_PLAYA)
                 delay(3_000)
                 val data = bundle.data

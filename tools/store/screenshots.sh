@@ -33,15 +33,16 @@ start_scene() {
   fi
 }
 
-# PROBE="<layers>;<layers>;...": the route scene once per set of map layers
-# left out, reporting whether the app survived. Takes no screenshots.
+# PROBE="<layers>;<layers>;...": the "navigate" scene once per set of map
+# layers left out, reporting whether the app crashed. Takes no screenshots.
 if [ -n "${PROBE:-}" ]; then
   IFS=';' read -ra SETS <<< "$PROBE"
   for hide in "${SETS[@]}"; do
     adb logcat -b crash -c || true
-    start_scene route "$hide"
+    start_scene navigate "$hide"
     sleep 150
-    if adb shell pidof "$PKG" >/dev/null; then verdict=alive; else verdict=CRASHED; fi
+    # Not pidof: the sticky driving service restarts the process after a crash.
+    if adb logcat -b crash -d | grep -q "Fatal signal"; then verdict=CRASHED; else verdict=survived; fi
     echo "PROBE hide=[$hide]: $verdict"
     adb logcat -b crash -d | grep -m3 -E "Fatal signal|#00 pc|#01 pc" || true
   done
@@ -56,8 +57,7 @@ n=1
 for scene in $ALL; do
   if [[ " $SCENES " == *" $scene "* ]]; then
     start_scene "$scene"
-    # Routes wait for the router to build its grid, which is slow on an emulator.
-    if [ "$scene" = route ]; then sleep 150; else sleep 40; fi
+    sleep 40
     adb exec-out screencap -p > "$OUT/$(printf '%02d' $n)-$scene.png"
     echo "captured $scene"
   fi
