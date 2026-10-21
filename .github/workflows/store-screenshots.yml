@@ -17,6 +17,10 @@ on:
         description: Also record the foreground service video (replaces the committed one)
         type: boolean
         default: false
+      scenes:
+        description: "Only these screenshots, space-separated (map warning route search fleet night); empty = all"
+        type: string
+        default: ""
       gpu:
         # MapLibre crashed in the deprecated swiftshader_indirect bridge
         # (GL2Encoder::s_glDrawElements) and parked maps came out blank.
@@ -48,6 +52,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Take screenshots on an emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          SCENES: ${{ inputs.scenes }}
         with:
           api-level: 34
           target: google_apis

@@ -3,7 +3,7 @@
 # .github/workflows/store-screenshots.yml). Each scene is set up by the debug
 # build's ScreenshotScenes (simulated car, debug controls hidden).
 #
-#   [VIDEO=<dir>] tools/store/screenshots.sh <app-debug.apk> <out-dir>
+#   [VIDEO=<dir>] [SCENES="route ..."] tools/store/screenshots.sh <app-debug.apk> <out-dir>
 set -euo pipefail
 APK="$1"
 OUT="$2"
@@ -29,15 +29,19 @@ start_scene() {
   adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" --es zep.screenshot "$1" >/dev/null
 }
 
-n=1
-SCENES="map warning route search fleet night"
+# SCENES (e.g. "route") retakes some of them; the file numbers stay the same.
+ALL="map warning route search fleet night"
+SCENES="${SCENES:-$ALL}"
 if [ -n "${VIDEO_ONLY:-}" ]; then SCENES=""; fi
-for scene in $SCENES; do
-  start_scene "$scene"
-  # Routes wait for the router to build its grid, which is slow on an emulator.
-  if [ "$scene" = route ]; then sleep 150; else sleep 40; fi
-  adb exec-out screencap -p > "$OUT/$(printf '%02d' $n)-$scene.png"
-  echo "captured $scene"
+n=1
+for scene in $ALL; do
+  if [[ " $SCENES " == *" $scene "* ]]; then
+    start_scene "$scene"
+    # Routes wait for the router to build its grid, which is slow on an emulator.
+    if [ "$scene" = route ]; then sleep 150; else sleep 40; fi
+    adb exec-out screencap -p > "$OUT/$(printf '%02d' $n)-$scene.png"
+    echo "captured $scene"
+  fi
   n=$((n + 1))
 done
 
