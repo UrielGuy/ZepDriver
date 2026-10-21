@@ -44,7 +44,7 @@ done
 # then back to the app.
 if [ -n "${VIDEO:-}" ]; then
   start_scene video
-  sleep 150   # route planned and the car driving
+  sleep 40    # the car driving
   adb shell screenrecord --time-limit 75 --bit-rate 6000000 /sdcard/fgs.mp4 &
   REC=$!
   sleep 15                                              # navigating in the app
@@ -61,3 +61,9 @@ if [ -n "${VIDEO:-}" ]; then
   echo "recorded the foreground service video"
 fi
 adb shell am broadcast -a com.android.systemui.demo -e command exit >/dev/null
+
+# What happened to the app (crashes, memory kills, map errors), for the CI log.
+echo "--- crashes ---"
+adb logcat -b crash -d | tail -n 80 || true
+echo "--- app and memory ---"
+adb logcat -d | grep -E "zepdriver|ZepDriver|AndroidRuntime|lowmemorykiller|lmkd|MapLibre|Mbgl|Router" | tail -n 150 || true

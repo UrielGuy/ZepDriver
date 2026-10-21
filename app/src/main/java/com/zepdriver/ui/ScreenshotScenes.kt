@@ -36,6 +36,15 @@ object ScreenshotScenes {
         vm.viewModelScope.launch { run(scene, vm) }
     }
 
+    /** Parked at [start]; re-centers a few times so the map draws around the car. */
+    private suspend fun parked(vm: MainViewModel, start: SimStart) {
+        vm.sim.setStart(start)
+        repeat(3) {
+            delay(8_000)
+            vm.recenter()
+        }
+    }
+
     private suspend fun run(scene: String, vm: MainViewModel) {
         vm.setScreenshotMode(true)
         val bundle = vm.bundle.filterNotNull().first()
@@ -54,16 +63,22 @@ object ScreenshotScenes {
         AppGraph.drive.stopNavigation()
         vm.setTab(Tab.DRIVE)
         when (scene) {
-            "map" -> sim.setStart(SimStart.OPEN_PLAYA)
-            "night" -> sim.setStart(SimStart.DEEP_PLAYA)
+            "map" -> parked(vm, SimStart.OPEN_PLAYA)
+            "night" -> parked(vm, SimStart.DEEP_PLAYA)
             "warning" -> {
                 // Too fast on the playa side of the Esplanade: the speed alarm.
                 sim.setStart(SimStart.ESPLANADE)
                 delay(1_500)
                 sim.changeSpeed(7.5)
             }
-            // "video": the same drive, recorded for Play's foreground service declaration.
-            "route", "video" -> {
+            // Recorded for Play's foreground service declaration: a steady drive whose
+            // tracking and warnings carry on with the app in the background.
+            "video" -> {
+                sim.setStart(SimStart.ESPLANADE)
+                delay(1_500)
+                sim.changeSpeed(4.5)
+            }
+            "route" -> {
                 sim.setStart(SimStart.OPEN_PLAYA)
                 delay(3_000)
                 val data = bundle.data

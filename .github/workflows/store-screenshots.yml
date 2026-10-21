@@ -37,6 +37,9 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          # Phone-like memory: the route planner needs more than the emulator default.
+          ram-size: 4096M
+          heap-size: 512M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: VIDEO=store/assets/videos tools/store/screenshots.sh app/build/outputs/apk/debug/app-debug.apk store/assets/screenshots
