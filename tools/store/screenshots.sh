@@ -30,7 +30,9 @@ start_scene() {
 }
 
 n=1
-for scene in map warning route search fleet night; do
+SCENES="map warning route search fleet night"
+if [ -n "${VIDEO_ONLY:-}" ]; then SCENES=""; fi
+for scene in $SCENES; do
   start_scene "$scene"
   # Routes wait for the router to build its grid, which is slow on an emulator.
   if [ "$scene" = route ]; then sleep 150; else sleep 40; fi

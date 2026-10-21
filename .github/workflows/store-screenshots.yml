@@ -8,6 +8,11 @@ name: Store screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      video_only:
+        description: Only record the foreground service video (faster)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -42,7 +47,7 @@ jobs:
           heap-size: 512M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: VIDEO=store/assets/videos tools/store/screenshots.sh app/build/outputs/apk/debug/app-debug.apk store/assets/screenshots
+          script: VIDEO=store/assets/videos VIDEO_ONLY=${{ inputs.video_only && '1' || '' }} tools/store/screenshots.sh app/build/outputs/apk/debug/app-debug.apk store/assets/screenshots
       - name: Keep them as a download too
         uses: actions/upload-artifact@v4
         with:
