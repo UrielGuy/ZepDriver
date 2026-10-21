@@ -151,5 +151,22 @@ def main():
         promote(service(), a.source, a.target, a.rollout, a.dry_run)
 
 
+HINTS = {
+    "SERVICE_DISABLED": "Enable the Google Play Android Developer API in the service "
+                        "account's Cloud project (store/play-setup.md, Part 5, step 2).",
+    "403": "Give the service account the permission in Play Console -> Users and "
+           "permissions (store listing: \"Manage store presence\"; production: "
+           "\"Release to production\").",
+}
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:  # googleapiclient.errors.HttpError, without importing it early
+        status = getattr(getattr(e, "resp", None), "status", None)
+        if status is None:
+            raise
+        text = str(e)
+        hint = HINTS["SERVICE_DISABLED"] if "SERVICE_DISABLED" in text else HINTS.get(str(status), "")
+        sys.exit(f"Google Play said {status}: {getattr(e, 'reason', text)}\n{hint}".rstrip())

@@ -81,7 +81,10 @@ Without this, Play installs would show "Naughty!" once 2027 data arrives.
 5. In **Play Console → Users and permissions → Invite new users**:
    - Paste the service account's email (it ends in `@…iam.gserviceaccount.com`).
    - Under **App permissions**, add ZepDriver with **"Release apps to testing
-     tracks"**, then **Invite user**.
+     tracks"**, then **Invite user**. To let the Google Play workflow (below)
+     update the listing and release to production too, also tick **"Manage
+     store presence"** and **"Release to production, exclude devices, and use
+     Play App Signing"**.
 6. In GitHub, add a secret named `PLAY_SERVICE_ACCOUNT_JSON`. Paste the
    **entire JSON file** as its value.
 7. **Test it:** go to **Actions → Android CI → Run workflow** and tick **"Also
@@ -97,3 +100,17 @@ Without this, Play installs would show "Naughty!" once 2027 data arrives.
    [play-console-answers.md](play-console-answers.md).
 3. **Closed testing:** run a closed track with **12+ testers for 14 days**
    (personal-account rule), then **Apply for production**.
+
+## The Google Play workflow
+
+**Actions → Google Play → Run workflow** uses the same service account:
+
+- **listing** replaces the store listing (texts, icon, feature graphic,
+  screenshots) with what's in [assets/](assets/).
+- **promote** puts the newest internal-testing build on closed testing
+  (`alpha`), open testing (`beta`) or `production`, with the notes from
+  `assets/text/release-notes.txt`. A rollout below 100 is a staged rollout.
+- **Only show what would change** checks access without changing anything.
+
+Production only works once Play has granted production access (after the
+closed test).
