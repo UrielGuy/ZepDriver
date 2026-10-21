@@ -14,10 +14,12 @@ on:
         type: boolean
         default: false
       gpu:
-        description: "Emulator rendering: guest = software inside the emulator (slower; avoids MapLibre crashing in the host GL bridge)"
+        # MapLibre crashed in the deprecated swiftshader_indirect bridge
+        # (GL2Encoder::s_glDrawElements) and parked maps came out blank.
+        description: "Emulator rendering (swangle_indirect = ANGLE on SwiftShader)"
         type: choice
-        options: [swiftshader_indirect, guest, swangle_indirect]
-        default: guest
+        options: [swangle_indirect, guest, swiftshader_indirect]
+        default: swangle_indirect
 
 permissions:
   contents: write
