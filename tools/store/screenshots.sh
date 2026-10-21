@@ -57,7 +57,9 @@ n=1
 for scene in $ALL; do
   if [[ " $SCENES " == *" $scene "* ]]; then
     start_scene "$scene"
-    sleep 40
+    # The route list says "Preparing routes" until the router's grid is built,
+    # which is slow on an emulator.
+    if [ "$scene" = route ]; then sleep 150; else sleep 40; fi
     adb exec-out screencap -p > "$OUT/$(printf '%02d' $n)-$scene.png"
     echo "captured $scene"
   fi
