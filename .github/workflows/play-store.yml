@@ -1,0 +1,61 @@
+name: Google Play
+
+# Run by hand from the Actions tab. Uses the PLAY_SERVICE_ACCOUNT_JSON secret
+# (tools/store/play_publish.py):
+# - "listing": replaces the en-US store listing with store/assets/ (texts,
+#   icon, feature graphic, screenshots).
+# - "promote": puts the newest internal-testing release on closed testing
+#   (alpha), open testing (beta) or production, optionally as a staged rollout.
+# Builds reach internal testing from the Android CI workflow ("Also upload to
+# Google Play") or the daily data check.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [listing, promote]
+        default: listing
+      to:
+        description: "promote: target track"
+        type: choice
+        options: [alpha, beta, production]
+        default: alpha
+      rollout:
+        description: "promote: percent of users (100 = everyone)"
+        type: number
+        default: 100
+      dry_run:
+        description: Only show what would change
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: play-store
+  cancel-in-progress: false
+
+jobs:
+  play:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Play API client
+        run: pip install --quiet google-api-python-client google-auth
+      - name: Update Google Play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          ACTION: ${{ inputs.action }}
+          TO: ${{ inputs.to }}
+          ROLLOUT: ${{ inputs.rollout }}
+          DRY: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          if [ "$ACTION" = listing ]; then
+            python3 tools/store/play_publish.py listing $DRY
+          else
+            python3 tools/store/play_publish.py promote --to "$TO" --rollout "$ROLLOUT" $DRY
+          fi
