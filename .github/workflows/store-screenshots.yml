@@ -13,6 +13,11 @@ on:
         description: Only record the foreground service video (faster)
         type: boolean
         default: false
+      gpu:
+        description: "Emulator rendering: guest = software inside the emulator (slower; avoids MapLibre crashing in the host GL bridge)"
+        type: choice
+        options: [swiftshader_indirect, guest, swangle_indirect]
+        default: guest
 
 permissions:
   contents: write
@@ -46,7 +51,7 @@ jobs:
           ram-size: 4096M
           heap-size: 512M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu ${{ inputs.gpu }} -no-snapshot -noaudio -no-boot-anim -camera-back none
           script: VIDEO=store/assets/videos VIDEO_ONLY=${{ inputs.video_only && '1' || '' }} tools/store/screenshots.sh app/build/outputs/apk/debug/app-debug.apk store/assets/screenshots
       - name: Keep them as a download too
         uses: actions/upload-artifact@v4
