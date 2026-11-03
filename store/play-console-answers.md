@@ -66,12 +66,17 @@ location).
   > their fleet. The service stops when the driver taps Stop in the
   > notification.
 
-- Video: [videos/foreground-service-location.mp4](assets/videos/foreground-service-location.mp4)
-  (75 s; upload it to YouTube as **Unlisted** and paste the link). It shows
-  the car driving with live speed and the potty arrow, the app going to the
-  background, the notification updating the car's speed and position
-  (4:45 @ 2,450 ft, then 4:50 and 4:55 & Esplanade), and the app coming back
-  with the car further along and the "Driving on Esplanade" warning up.
+- Videos, one per task (upload each to YouTube as **Unlisted** and paste the
+  links):
+  - Navigation: [videos/foreground-service-navigation.mp4](assets/videos/foreground-service-navigation.mp4).
+    A route with two stops is followed on the map; the app goes to the
+    background and the notification keeps counting down to the next stop;
+    back in the app, the car is further along the route.
+  - User-initiated location sharing: [videos/foreground-service-location-sharing.mp4](assets/videos/foreground-service-location-sharing.mp4).
+    The driver taps Connect over Bluetooth in Settings > Radio, the radio
+    connects and the other cars show up in Fleet and on the map; in the
+    background the notification says "Sharing position with the fleet".
+    (Recorded with the simulator's pretend radio and fleet.)
 
 ## Other declarations
 News app: No · Health: No · Financial features: No · Government app: No ·
