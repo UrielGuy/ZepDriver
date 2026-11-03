@@ -133,5 +133,15 @@ private fun SimulatorSettings(vm: MainViewModel) {
             checked = state.fakeFleet,
             onChange = sim::setFakeFleet,
         )
+        SwitchRow(
+            title = "Fake radio",
+            subtitle = if (state.enabled) {
+                "Connect over Bluetooth reaches a pretend radio, so position sharing looks connected. Nothing is transmitted."
+            } else {
+                "Turn on simulated GPS first."
+            },
+            checked = state.fakeRadio,
+            onChange = sim::setFakeRadio,
+        )
     }
 }

@@ -83,6 +83,8 @@ class MeshControllerImpl(
     private var lastSentMode: DrivingMode? = null
     /** Simulator vehicles (debug builds): shown in [fleet], never persisted or transmitted. */
     private var simVehicles: List<FleetVehicle> = emptyList()
+    /** Simulator (debug builds): Bluetooth connects to a pretend radio that transmits nothing. */
+    private var simRadio = false
 
     // --- connection status (written on the mesh thread) ---
     @Volatile private var nameBlank = settings.profile.value.carName.isBlank()
@@ -156,6 +158,10 @@ class MeshControllerImpl(
     override fun connectBluetooth() = onMesh {
         if (!carNameOk()) return@onMesh
         if (usbConn == MeshConnection.ERROR) usbConn = null
+        if (simRadio) {
+            connectSimulatedRadio()
+            return@onMesh
+        }
         if (!ble.hasPermissions()) {
             bleConn = MeshConnection.ERROR
             publish("Bluetooth permission needed")
@@ -206,6 +212,33 @@ class MeshControllerImpl(
     /** Shows a message from a simulated car. It is never sent over the radio or saved. */
     fun addSimulatedMessage(message: MeshText) = onMesh {
         _messages.value = (_messages.value + message).takeLast(MAX_MESSAGES)
+    }
+
+    /** Makes "Connect over Bluetooth" reach a pretend radio named after the car (or stops that). */
+    fun setSimulatedRadio(enabled: Boolean) = onMesh {
+        if (simRadio == enabled) return@onMesh
+        simRadio = enabled
+        if (!enabled && !ble.isReady && bleConn != MeshConnection.DISCONNECTED) {
+            bleConn = MeshConnection.DISCONNECTED
+            publish("Disconnected")
+        }
+    }
+
+    /** The real link's steps, with no radio. [onFix] and [sendText] still send nothing ([ble] isn't ready). */
+    private fun connectSimulatedRadio() {
+        bleConn = MeshConnection.SCANNING
+        publish("Looking for your radio…")
+        scope.launch(meshThread) {
+            delay(1_500)
+            if (!simRadio || bleConn != MeshConnection.SCANNING) return@launch
+            _state.update { it.copy(deviceName = carName()) }
+            bleConn = MeshConnection.CONNECTING
+            publish("Reading radio settings…")
+            delay(1_500)
+            if (!simRadio || bleConn != MeshConnection.CONNECTING) return@launch
+            bleConn = MeshConnection.CONNECTED
+            publish("Connected to ${_state.value.deviceName ?: "radio"}")
+        }
     }
 
     /** Removes every simulated vehicle and message. */

@@ -4,17 +4,17 @@ name: Store screenshots
 # emulator through the debug-only screenshot scenes (ui/ScreenshotScenes.kt,
 # tools/store/screenshots.sh) and commits the Play Store phone screenshots to
 # store/assets/screenshots/ (1080 × 1920, 16:9, as Play wants), plus the
-# foreground service video Play asks for (store/assets/videos/).
+# foreground service videos Play asks for (store/assets/videos/).
 
 on:
   workflow_dispatch:
     inputs:
       video_only:
-        description: Only record the foreground service video (faster)
+        description: Only record the foreground service videos (faster)
         type: boolean
         default: false
       video:
-        description: Also record the foreground service video (replaces the committed one)
+        description: Also record the foreground service videos (replace the committed ones)
         type: boolean
         default: false
       scenes:

@@ -25,6 +25,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.zepdriver.AppGraph
 import com.zepdriver.DriveUiState
+import com.zepdriver.MeshConnection
 import com.zepdriver.ZepApp
 import com.zepdriver.data.EmbargoControllerImpl
 import com.zepdriver.core.geo.Fix
@@ -34,6 +35,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.ceil
@@ -75,7 +79,10 @@ class DriveService : Service() {
         engine = (application as ZepApp).driveEngine
         embargo = (application as ZepApp).embargo
         createChannel()
-        scope.launch { engine.state.collect { if (foreground) updateNotification(it) } }
+        val sharing = AppGraph.mesh.state.map { it.connection == MeshConnection.CONNECTED }.distinctUntilChanged()
+        scope.launch {
+            combine(engine.state, sharing) { s, sh -> s to sh }.collect { (s, sh) -> if (foreground) updateNotification(s, sh) }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -177,7 +184,7 @@ class DriveService : Service() {
         NotificationManagerCompat.from(this).createNotificationChannel(channel)
     }
 
-    private fun buildNotification(text: String): Notification {
+    private fun buildNotification(text: String, sharing: Boolean = false): Notification {
         val open = packageManager.getLaunchIntentForPackage(packageName)?.let {
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         }
@@ -189,6 +196,7 @@ class DriveService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle("ZepDriver is running")
             .setContentText(text)
+            .setSubText(if (sharing) "Sharing position with the fleet" else null)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -199,7 +207,7 @@ class DriveService : Service() {
             .build()
     }
 
-    private fun updateNotification(state: DriveUiState) {
+    private fun updateNotification(state: DriveUiState, sharing: Boolean) {
         val drive = state.drive
         // Navigating: where to and how long; otherwise where we are.
         val where = state.nav?.takeIf { !it.finished }?.let { nav ->
@@ -211,10 +219,11 @@ class DriveService : Service() {
             else -> "Parked$where"
         }
         val now = System.currentTimeMillis()
-        if (text == lastNotificationText || now - lastNotificationAt < 5_000) return
-        lastNotificationText = text
+        val key = "$text|$sharing"
+        if (key == lastNotificationText || now - lastNotificationAt < 5_000) return
+        lastNotificationText = key
         lastNotificationAt = now
-        getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, buildNotification(text))
+        getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, buildNotification(text, sharing))
     }
 
     companion object {

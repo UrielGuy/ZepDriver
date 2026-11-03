@@ -66,26 +66,88 @@ for scene in $ALL; do
   n=$((n + 1))
 done
 
-# The foreground service video for Play's declaration: navigating, then the
-# app goes to the background and keeps working (status in the notification),
-# then back to the app.
-if [ -n "${VIDEO:-}" ]; then
-  start_scene video
-  sleep 40    # the car driving
-  adb shell screenrecord --time-limit 75 --bit-rate 6000000 /sdcard/fgs.mp4 &
-  REC=$!
-  sleep 15                                              # navigating in the app
-  adb shell input keyevent KEYCODE_HOME; sleep 8        # app in the background
-  adb shell cmd statusbar expand-notifications; sleep 12  # the service keeps navigating
+# The foreground service videos for Play's declaration, one per task.
+ready() { adb logcat -d -s ZepScenes:I | grep -q zep-scene-ready; }
+crashed() { adb logcat -b crash -d | grep -q "Fatal signal"; }
+fresh_logs() { adb logcat -c; adb logcat -b crash -c || true; }
+# "x y" at the middle of the first thing on screen whose text is exactly $1.
+find_text() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 0
+  adb exec-out cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" \
+    | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | tr -c '0-9\n' ' ' \
+    | awk '{ print int(($1 + $3) / 2), int(($2 + $4) / 2) }' || true
+}
+tap() { if [ -n "$1" ]; then adb shell input tap $1; else echo "nothing to tap"; fi; }
+from_background() {
+  adb shell input keyevent KEYCODE_HOME; sleep 6                 # app in the background
+  adb shell cmd statusbar expand-notifications; sleep 12         # the service carries on
   adb shell cmd statusbar collapse; sleep 12
-  adb shell cmd statusbar expand-notifications; sleep 10  # progress since
+  adb shell cmd statusbar expand-notifications; sleep 10         # progress since
   adb shell cmd statusbar collapse; sleep 2
   adb shell am start -n "$PKG/com.zepdriver.ui.MainActivity" >/dev/null   # back in the app
-  wait $REC || true
+}
+
+# Navigation: following a planned route, in the app and from the background.
+# Takes [map layers to leave out] in case the emulator's GL crashes on some.
+record_navigation() {
+  fresh_logs
+  start_scene navigation "$1"
+  local t=0
+  until ready; do
+    sleep 5; t=$((t + 5))
+    if crashed || [ $t -ge 360 ]; then return 1; fi
+  done
+  adb shell screenrecord --time-limit 80 --bit-rate 6000000 /sdcard/nav.mp4 &
+  local rec=$!
+  sleep 20    # following the route
+  from_background
+  wait $rec || true
   sleep 3
+  ! crashed
+}
+
+# Location sharing: the driver connects the fleet radio (a pretend one in the
+# simulator), the other cars show up, and sharing carries on in the background.
+record_sharing() {
+  fresh_logs
+  adb shell settings put system show_touches 1
+  start_scene sharing
+  local t=0
+  until ready || [ $t -ge 120 ]; do sleep 5; t=$((t + 5)); done
+  sleep 3
+  local connect fleet drive
+  connect=$(find_text "Connect over Bluetooth"); fleet=$(find_text "Fleet"); drive=$(find_text "Drive")
+  echo "taps: connect=[$connect] fleet=[$fleet] drive=[$drive]"
+  adb shell screenrecord --time-limit 80 --bit-rate 6000000 /sdcard/share.mp4 &
+  local rec=$!
+  sleep 4; tap "$connect"; sleep 9    # looking for the radio, then connected
+  tap "$fleet"; sleep 10              # the other cars
+  tap "$drive"; sleep 10              # on the map
+  from_background
+  wait $rec || true
+  sleep 3
+  adb shell settings put system show_touches 0
+  ! crashed
+}
+
+if [ -n "${VIDEO:-}" ]; then
   mkdir -p "$VIDEO"
-  adb pull /sdcard/fgs.mp4 "$VIDEO/foreground-service-location.mp4"
-  echo "recorded the foreground service video"
+  for hide in "" "blocks,landmarks,art" "street-labels,home-label,favorite-labels,camp-labels,poi-labels,toilet-labels,art-labels,fleet-labels,stop-numbers"; do
+    if record_navigation "$hide"; then
+      adb pull /sdcard/nav.mp4 "$VIDEO/foreground-service-navigation.mp4"
+      echo "recorded the navigation video (map layers left out: [$hide])"
+      break
+    fi
+    echo "navigation video failed (map layers left out: [$hide])"
+    adb logcat -b crash -d | grep -m3 -E "Fatal signal|#00 pc|#01 pc" || true
+  done
+  if record_sharing; then
+    adb pull /sdcard/share.mp4 "$VIDEO/foreground-service-location-sharing.mp4"
+    echo "recorded the location sharing video"
+  else
+    echo "location sharing video failed"
+    adb logcat -b crash -d | grep -m3 -E "Fatal signal|#00 pc|#01 pc" || true
+  fi
 fi
 adb shell am broadcast -a com.android.systemui.demo -e command exit >/dev/null
 

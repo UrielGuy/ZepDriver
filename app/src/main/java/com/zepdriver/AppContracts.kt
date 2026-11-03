@@ -194,6 +194,8 @@ data class SimState(
     val following: Boolean = false,
     /** Made-up vehicles (and one hello message) in the fleet view; never transmitted. */
     val fakeFleet: Boolean = false,
+    /** "Connect over Bluetooth" reaches a pretend radio; nothing is transmitted. */
+    val fakeRadio: Boolean = false,
     /**
      * Time warp: simulated time runs this many times faster than real time
      * (1, 2, 5, 10 or 20; see SimClock). Speeds stay real playa speeds.
@@ -216,6 +218,7 @@ interface SimulatorController {
     /** Moves the car to [start] and stops (MANUAL / AUTOPILOT). */
     fun setStart(start: SimStart)
     fun setFakeFleet(enabled: Boolean)
+    fun setFakeRadio(enabled: Boolean)
     /** Changes the target speed by [deltaMph] (kept within 0..10). In TOUR mode this takes over (MANUAL). */
     fun changeSpeed(deltaMph: Double)
     /** Steering while a button is held: degrees per second, positive = right; 0 on release. */

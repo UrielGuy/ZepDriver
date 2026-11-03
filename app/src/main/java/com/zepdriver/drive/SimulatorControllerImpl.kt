@@ -63,6 +63,7 @@ class SimulatorControllerImpl(
         simData = null
         clock = null
         stopFleet()
+        mesh.setSimulatedRadio(false)
         _state.update {
             SimState(enabled = enabled, mode = it.mode, start = it.start, warp = it.warp)
         }
@@ -88,6 +89,12 @@ class SimulatorControllerImpl(
         if (enabled && !_state.value.enabled) return@command
         _state.update { it.copy(fakeFleet = enabled) }
         if (!enabled) stopFleet()
+    }
+
+    override fun setFakeRadio(enabled: Boolean) = command {
+        if (enabled && !_state.value.enabled) return@command
+        _state.update { it.copy(fakeRadio = enabled) }
+        mesh.setSimulatedRadio(enabled)
     }
 
     override fun changeSpeed(deltaMph: Double) = command {

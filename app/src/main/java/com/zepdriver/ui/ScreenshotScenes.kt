@@ -1,8 +1,11 @@
 package com.zepdriver.ui
 
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.zepdriver.AppGraph
+import com.zepdriver.MeshConnection
+import com.zepdriver.PlayaBundle
 import com.zepdriver.ThemeMode
 import com.zepdriver.core.geo.Xy
 import com.zepdriver.core.nav.Destination
@@ -41,6 +44,9 @@ object ScreenshotScenes {
         vm.viewModelScope.launch { run(scene, vm) }
     }
 
+    /** Logged when a video scene is ready to record (tools/store/screenshots.sh waits for it). */
+    const val READY = "zep-scene-ready"
+
     /** Parked at [start]; re-centers a few times so the map draws around the car. */
     private suspend fun parked(vm: MainViewModel, start: SimStart) {
         vm.sim.setStart(start)
@@ -49,6 +55,15 @@ object ScreenshotScenes {
             vm.recenter()
         }
     }
+
+    private fun campNear(bundle: PlayaBundle, address: String): Destination? {
+        val data = bundle.data
+        val target = data.xy(bundle.addressing.parse(address) ?: return null)
+        val c = data.camps.indices.minByOrNull { data.campXy[it].distanceTo(target) }?.let { data.camps[it] } ?: return null
+        return Destination(c.name, c.position, DestinationKind.CAMP, refId = c.id, address = c.address)
+    }
+
+    private const val TAG = "ZepScenes"
 
     private suspend fun run(scene: String, vm: MainViewModel) {
         vm.setScreenshotMode(true)
@@ -63,7 +78,9 @@ object ScreenshotScenes {
             ),
         )
         sim.setEnabled(true)
-        sim.setFakeFleet(true)
+        // The sharing video connects the radio first; the fleet shows up once it has.
+        sim.setFakeFleet(scene != "sharing")
+        sim.setFakeRadio(scene == "sharing")
         sim.setMode(SimMode.MANUAL)
         AppGraph.drive.stopNavigation()
         vm.setTab(Tab.DRIVE)
@@ -83,19 +100,55 @@ object ScreenshotScenes {
                 delay(1_500)
                 sim.changeSpeed(4.5)
             }
+            // Play's foreground service declaration, navigation: a route planned on the
+            // Route tab, then followed on the map, in the app and from the background.
+            // (Planning with the map on screen crashed the emulator's GL encoder; see "route".)
+            "navigation" -> {
+                sim.setStart(SimStart.OPEN_PLAYA)
+                delay(3_000)
+                val data = bundle.data
+                val camp = campNear(bundle, "7:30 & E") ?: return
+                // An art piece on the way, halfway out from the Man (the projection's origin).
+                val half = data.projection.toXy(camp.position).let { Xy(it.x / 2, it.y / 2) }
+                val art = data.art.indices.minByOrNull { data.artXy[it].distanceTo(half) }?.let { data.art[it] }
+                vm.clearStops()
+                vm.setTab(Tab.ROUTE)
+                AppGraph.drive.navigate(
+                    listOfNotNull(art?.let { Destination(it.name, it.position, DestinationKind.ART, refId = it.id, address = it.address) }, camp),
+                )
+                withTimeoutOrNull(300_000) { vm.drive.first { it.nav != null } } ?: return
+                vm.setTab(Tab.DRIVE)
+                sim.setMode(SimMode.AUTOPILOT)
+                delay(10_000)
+                Log.i(TAG, READY)
+            }
+            // Play's foreground service declaration, location sharing: the driver connects
+            // the radio (a pretend one) and the fleet appears; the script does the tapping.
+            "sharing" -> {
+                vm.updateProfile(vm.profile.value.copy(carName = "Zeppelin"))
+                sim.setStart(SimStart.ESPLANADE)
+                delay(1_500)
+                sim.changeSpeed(4.5)
+                vm.setSettingsSection(SettingsSection.RADIO)
+                vm.setTab(Tab.SETTINGS)
+                delay(3_000)
+                Log.i(TAG, READY)
+                suspend fun connected() = withTimeoutOrNull(30_000) { vm.mesh.first { it.connection == MeshConnection.CONNECTED } }
+                // Connects by itself if the script's tap missed.
+                if (connected() == null) {
+                    vm.connectBluetooth()
+                    connected()
+                }
+                sim.setFakeFleet(true)
+            }
             // A planned multi-stop route. (Navigating crashes MapLibre in the emulator's
             // GL encoder, GL2Encoder::s_glDrawElements; see "navigate".)
             "route" -> {
                 sim.setStart(SimStart.OPEN_PLAYA)
                 delay(3_000)
                 val data = bundle.data
-                fun campNear(address: String): Destination? {
-                    val target = data.xy(bundle.addressing.parse(address) ?: return null)
-                    val c = data.camps.indices.minByOrNull { data.campXy[it].distanceTo(target) }?.let { data.camps[it] } ?: return null
-                    return Destination(c.name, c.position, DestinationKind.CAMP, refId = c.id, address = c.address)
-                }
-                val first = campNear("7:30 & E")
-                val last = campNear("4:30 & C")
+                val first = campNear(bundle, "7:30 & E")
+                val last = campNear(bundle, "4:30 & C")
                 // An art piece on the open playa, halfway out from the Man (the projection's origin).
                 val halfway = first?.let { data.projection.toXy(it.position) }?.let { Xy(it.x / 2, it.y / 2) }
                 val art = halfway?.let { h -> data.art.indices.minByOrNull { data.artXy[it].distanceTo(h) } }?.let { data.art[it] }
