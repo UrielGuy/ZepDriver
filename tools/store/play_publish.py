@@ -119,12 +119,31 @@ def promote(api, source, target, rollout, dry):
     if dry:
         api.edits().delete(packageName=PACKAGE, editId=edit).execute()
         return False
-    api.edits().tracks().update(
-        packageName=PACKAGE, editId=edit, track=target,
-        body={"track": target, "releases": [release]},
-    ).execute()
-    api.edits().commit(packageName=PACKAGE, editId=edit).execute()
-    print(f"{target} updated; Google reviews it before it goes live")
+    from googleapiclient.errors import HttpError
+    def update_and_commit():
+        api.edits().tracks().update(
+            packageName=PACKAGE, editId=edit, track=target,
+            body={"track": target, "releases": [release]},
+        ).execute()
+        api.edits().commit(packageName=PACKAGE, editId=edit).execute()
+    try:
+        update_and_commit()
+        draft = False
+    except HttpError as e:
+        # Until its first release is reviewed, Play only takes draft releases.
+        if "draft app" not in str(e):
+            raise
+        release.pop("userFraction", None)
+        release["status"] = "draft"
+        edit = api.edits().insert(packageName=PACKAGE, body={}).execute()["id"]
+        update_and_commit()
+        draft = True
+    if draft:
+        print(f"{target} has a draft release: the app has never been published, so roll it out "
+              "in Play Console (Test and release -> the track -> Edit release -> Review -> "
+              "Start rollout)")
+    else:
+        print(f"{target} updated; Google reviews it before it goes live")
     return True
 
 
