@@ -1,4 +1,4 @@
-ZepDriver is a free, offline co-pilot for Mutant Vehicle (art car) drivers in Black Rock City.
+Have an art car? Tired of explaining that you can't drive on esplanade or that the big circle around the man is a big NO-NO? People going over 5MPH because speedometers aren't built for that speed? Want to find the nearest porto easily?  Look no further. This app is here to help! All camps, art, porto and driving rules for Burning Man Mutant Vehicles in one spot!
 
 DRIVE SAFE AND LEGAL
 • A big GPS speedometer with warnings that get louder as you speed up

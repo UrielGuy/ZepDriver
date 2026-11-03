@@ -1,1 +1,1 @@
-Speedometer, zone warnings, navigation and a radio mesh for art car drivers
+A mutant vehicle driving assitant for TTIDD
