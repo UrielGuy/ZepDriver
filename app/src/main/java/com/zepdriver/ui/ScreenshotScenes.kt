@@ -122,13 +122,13 @@ object ScreenshotScenes {
                 delay(10_000)
                 Log.i(TAG, READY)
             }
-            // Play's foreground service declaration, location sharing: the driver connects
-            // the radio (a pretend one) and the fleet appears; the script does the tapping.
+            // Play's foreground service declaration, location sharing: parked (the app only
+            // shows the map while moving), the driver connects the radio (a pretend one), the
+            // fleet appears, and back on the map the car drives off. The script does the tapping.
             "sharing" -> {
                 vm.updateProfile(vm.profile.value.copy(carName = "Zeppelin"))
                 sim.setStart(SimStart.ESPLANADE)
                 delay(1_500)
-                sim.changeSpeed(4.5)
                 vm.setSettingsSection(SettingsSection.RADIO)
                 vm.setTab(Tab.SETTINGS)
                 delay(3_000)
@@ -140,6 +140,9 @@ object ScreenshotScenes {
                     connected()
                 }
                 sim.setFakeFleet(true)
+                withTimeoutOrNull(40_000) { vm.tab.first { it == Tab.DRIVE } } ?: vm.setTab(Tab.DRIVE)
+                delay(2_000)
+                sim.changeSpeed(4.5)
             }
             // A planned multi-stop route. (Navigating crashes MapLibre in the emulator's
             // GL encoder, GL2Encoder::s_glDrawElements; see "navigate".)

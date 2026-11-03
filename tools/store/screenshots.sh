@@ -118,11 +118,11 @@ record_sharing() {
   local connect fleet drive
   connect=$(find_text "Connect over Bluetooth"); fleet=$(find_text "Fleet"); drive=$(find_text "Drive")
   echo "taps: connect=[$connect] fleet=[$fleet] drive=[$drive]"
-  adb shell screenrecord --time-limit 80 --bit-rate 6000000 /sdcard/share.mp4 &
+  adb shell screenrecord --time-limit 85 --bit-rate 6000000 /sdcard/share.mp4 &
   local rec=$!
-  sleep 4; tap "$connect"; sleep 9    # looking for the radio, then connected
+  sleep 4; tap "$connect"; sleep 8    # looking for the radio, then connected
   tap "$fleet"; sleep 10              # the other cars
-  tap "$drive"; sleep 10              # on the map
+  tap "$drive"; sleep 16              # on the map, driving off
   from_background
   wait $rec || true
   sleep 3
