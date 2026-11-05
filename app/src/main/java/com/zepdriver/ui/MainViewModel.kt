@@ -81,7 +81,7 @@ class MainViewModel : ViewModel() {
     val timeSource: StateFlow<TimeSource?> = AppGraph.embargo.timeSource
     val prefs: StateFlow<AppPrefs> = AppGraph.settings.prefs
     val favorites: StateFlow<List<Favorite>> = AppGraph.settings.favorites
-    /** Playa simulator (debug builds only; see [SimulatorController.available]). */
+    /** Playa simulator (see [SimulatorController.available]). */
     val sim: SimulatorController = AppGraph.sim
 
     // Debug builds: an unlock toggle that keeps the full UI usable while moving (for testing).
@@ -89,7 +89,7 @@ class MainViewModel : ViewModel() {
     val debugUnlocked: StateFlow<Boolean> = _debugUnlocked.asStateFlow()
 
     fun toggleDebugUnlock() {
-        if (sim.available) _debugUnlocked.update { !it }
+        if (sim.debugBuild) _debugUnlocked.update { !it }
     }
 
     // Debug builds: store screenshot scenes hide the debug-only controls (see ScreenshotScenes).
@@ -97,7 +97,7 @@ class MainViewModel : ViewModel() {
     val screenshotMode: StateFlow<Boolean> = _screenshotMode.asStateFlow()
 
     fun setScreenshotMode(on: Boolean) {
-        if (sim.available) _screenshotMode.value = on
+        if (sim.debugBuild) _screenshotMode.value = on
     }
 
     // Debug builds: map layers left out, to find what the emulator's GL can't draw.
@@ -105,7 +105,7 @@ class MainViewModel : ViewModel() {
     val hiddenLayers: StateFlow<Set<String>> = _hiddenLayers.asStateFlow()
 
     fun setHiddenLayers(ids: Set<String>) {
-        if (sim.available) _hiddenLayers.value = ids
+        if (sim.debugBuild) _hiddenLayers.value = ids
     }
 
     /** The moving lock, unless overridden in a debug build. */

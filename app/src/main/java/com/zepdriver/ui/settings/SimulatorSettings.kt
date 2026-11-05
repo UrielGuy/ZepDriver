@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zepdriver.SimulatorController.Companion.AWAY_MILES
 import com.zepdriver.core.sim.SimClock
 import com.zepdriver.core.sim.SimMode
 import com.zepdriver.core.sim.SimStart
@@ -31,10 +32,11 @@ private fun SimMode.description(): String = when (this) {
         "Plan a route first; with no route the car slows to a stop."
 }
 
-/** "Simulator (testing)": debug builds only. */
+/** "Simulator": anywhere in debug builds, otherwise only away from the playa. */
 @Composable
 internal fun SimulatorSection(vm: MainViewModel) {
     val sim = vm.sim
+    val state by sim.state.collectAsStateWithLifecycle()
     Column(
         Modifier
             .fillMaxWidth()
@@ -42,9 +44,12 @@ internal fun SimulatorSection(vm: MainViewModel) {
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        SectionTitle("Simulator (testing)")
-        if (!sim.available) {
-            Text("Only available in debug builds.", style = MaterialTheme.typography.bodyMedium)
+        SectionTitle("Simulator")
+        if (!sim.debugBuild && !state.awayFromPlaya) {
+            Text(
+                "Only available more than ${AWAY_MILES.toInt()} miles from Black Rock City.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         } else {
             SimulatorSettings(vm)
         }
@@ -57,13 +62,15 @@ private fun SimulatorSettings(vm: MainViewModel) {
     val state by sim.state.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            "Replaces GPS with a simulated car at Black Rock City. For testing at home.",
+            "Replaces GPS with a simulated car at Black Rock City, to try the app away from the playa. " +
+                "It turns itself on when you're more than ${AWAY_MILES.toInt()} miles from the city.",
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
             "Warnings, navigation, Potties and the trip log react as if you were driving on playa. " +
                 "Long-press the map to move the car there. " +
-                "Simulated positions are never sent to other cars. Turns itself off when the app restarts.",
+                "Simulated positions are never sent to other cars." +
+                if (sim.debugBuild) "" else " Near Black Rock City it turns off and the phone's GPS takes over.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

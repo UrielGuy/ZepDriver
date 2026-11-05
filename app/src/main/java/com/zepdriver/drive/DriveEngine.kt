@@ -7,6 +7,7 @@ import com.zepdriver.PlayaBundle
 import com.zepdriver.PlayaRepository
 import com.zepdriver.SettingsStore
 import com.zepdriver.core.alerts.AlertLevel
+import com.zepdriver.core.data.PlayaData
 import com.zepdriver.core.geo.Fix
 import com.zepdriver.core.geo.LatLon
 import com.zepdriver.core.nav.Destination
@@ -73,7 +74,7 @@ class DriveEngine(
     private var lastLogged: Fix? = null
     private var lastLoggedLevel = AlertLevel.NONE
 
-    /** Non-null while the playa simulator replaces GPS (debug builds). */
+    /** Non-null while the playa simulator replaces GPS. */
     private var sim: SimFixSource? = null
     private var simJob: Job? = null
 
@@ -91,8 +92,17 @@ class DriveEngine(
 
     fun setServiceRunning(running: Boolean) = _state.update { it.copy(serviceRunning = running) }
 
+    /**
+     * Sees every real fix first (SimulatorControllerImpl.onRealFix, which
+     * starts the simulator away from the playa); true drops the fix.
+     */
+    @Volatile var realFixFilter: ((PlayaData, Fix) -> Boolean)? = null
+
     /** A real GPS fix; ignored while the simulator is driving. */
-    fun onFix(fix: Fix) = post { if (sim == null) process(fix) }
+    fun onFix(fix: Fix) = post {
+        val dropped = bundle?.let { b -> realFixFilter?.invoke(b.data, fix) } == true
+        if (sim == null && !dropped) process(fix)
+    }
 
     // --- called by SimulatorControllerImpl ---------------------------------------
 

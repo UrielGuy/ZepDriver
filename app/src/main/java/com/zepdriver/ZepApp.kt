@@ -64,8 +64,10 @@ class ZepApp : Application() {
         AppGraph.trips = trips
         AppGraph.mesh = mesh
         AppGraph.drive = DriveControllerImpl(this, engine)
-        // Playa simulator for testing at home: debug builds only, always starts off.
-        AppGraph.sim = SimulatorControllerImpl(engine, mesh, available = BuildConfig.DEBUG)
+        // Playa simulator: starts off, and turns itself on away from the playa.
+        val sim = SimulatorControllerImpl(engine, mesh, debugBuild = BuildConfig.DEBUG)
+        engine.realFixFilter = sim::onRealFix
+        AppGraph.sim = sim
         AppGraph.voice = VoiceControllerImpl(this, appScope)
 
         embargo.start()

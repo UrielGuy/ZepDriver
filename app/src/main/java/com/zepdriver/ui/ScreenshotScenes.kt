@@ -37,8 +37,8 @@ object ScreenshotScenes {
     val SCENES = listOf("map", "warning", "route", "search", "fleet", "night")
 
     fun handle(intent: Intent?, vm: MainViewModel) {
-        // The simulator only exists in debug builds; release builds ignore the extra.
-        if (!vm.sim.available) return
+        // Screenshot scenes are a debug-build tool; release builds ignore the extra.
+        if (!vm.sim.debugBuild) return
         val scene = intent?.getStringExtra(EXTRA) ?: return
         vm.setHiddenLayers(intent?.getStringExtra(EXTRA_HIDE)?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet().orEmpty())
         vm.viewModelScope.launch { run(scene, vm) }

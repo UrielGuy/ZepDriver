@@ -45,6 +45,9 @@ import kotlin.math.roundToInt
 @Composable
 fun SettingsScreen(vm: MainViewModel, bundle: PlayaBundle, ui: DriveUiState) {
     val section by vm.settingsSection.collectAsStateWithLifecycle()
+    val simState by vm.sim.state.collectAsStateWithLifecycle()
+    // Release builds offer the simulator only away from the playa.
+    val simAvailable = vm.sim.debugBuild || simState.awayFromPlaya
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier
@@ -53,7 +56,7 @@ fun SettingsScreen(vm: MainViewModel, bundle: PlayaBundle, ui: DriveUiState) {
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            for (s in SettingsSection.entries.filter { it != SettingsSection.SIMULATOR || vm.sim.available }) {
+            for (s in SettingsSection.entries.filter { it != SettingsSection.SIMULATOR || simAvailable }) {
                 FilterChip(
                     selected = s == section,
                     onClick = { vm.setSettingsSection(s) },

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /** Supplies simulated fixes in place of GPS. Called on the drive engine's thread only. */
 interface SimFixSource {
@@ -41,8 +43,8 @@ interface SimFixSource {
 class SimulatorControllerImpl(
     private val engine: DriveEngine,
     private val mesh: MeshControllerImpl,
-    /** BuildConfig.DEBUG: the simulator is a testing tool. */
-    override val available: Boolean,
+    /** BuildConfig.DEBUG: the simulator works anywhere, not only away from the playa. */
+    override val debugBuild: Boolean,
 ) : SimulatorController, SimFixSource {
 
     private val _state = MutableStateFlow(SimState())
@@ -54,21 +56,56 @@ class SimulatorControllerImpl(
     private var fleet: FakeFleet? = null
     private var fleetData: PlayaData? = null
     private var clock: SimClock? = null
+    /** Turned on by itself on this trip away from the playa (so turning it off sticks). */
+    private var autoStarted = false
 
     override val warp: Int get() = _state.value.warp
 
-    override fun setEnabled(enabled: Boolean) = command {
-        if (enabled == _state.value.enabled) return@command
+    override fun setEnabled(enabled: Boolean) = command { enable(enabled) }
+
+    private fun enable(enabled: Boolean) {
+        if (enabled == _state.value.enabled) return
         sim = null
         simData = null
         clock = null
         stopFleet()
         mesh.setSimulatedRadio(false)
         _state.update {
-            SimState(enabled = enabled, mode = it.mode, start = it.start, warp = it.warp)
+            SimState(enabled = enabled, awayFromPlaya = it.awayFromPlaya, mode = it.mode, start = it.start, warp = it.warp)
         }
         engine.setSimulation(if (enabled) this else null)
     }
+
+    /**
+     * Every real GPS fix (engine thread), even while simulating. More than
+     * [SimulatorController.AWAY_MILES] from the Man the simulator turns
+     * itself on, once per trip away, instead of warning that the car is
+     * outside the fence. Coming back, release builds go back to GPS. Returns
+     * true when the drive engine should drop the fix.
+     */
+    fun onRealFix(data: PlayaData, fix: Fix): Boolean {
+        val miles = data.xy(fix.position).let { hypot(it.x, it.y) } / METERS_PER_MILE
+        val away = miles > SimulatorController.AWAY_MILES
+        if (away != _state.value.awayFromPlaya) _state.update { it.copy(awayFromPlaya = away) }
+        if (away && !autoStarted) {
+            autoStarted = true
+            if (!_state.value.enabled) {
+                enable(true)
+                say("${miles.roundToInt()} miles from Black Rock City: driving the simulator")
+            }
+        }
+        if (!away) {
+            autoStarted = false
+            if (_state.value.enabled && !debugBuild) {
+                enable(false)
+                say("At Black Rock City: using the phone's GPS")
+            }
+        }
+        return _state.value.enabled
+    }
+
+    /** Shown after the switch, which clears the driving view's message. */
+    private fun say(message: String) = engine.onEngine { engine.showMessage(message) }
 
     override fun setMode(mode: SimMode) = command {
         _state.update { it.copy(mode = mode) }
@@ -205,5 +242,9 @@ class SimulatorControllerImpl(
     private fun command(block: () -> Unit) {
         if (!available) return
         engine.onEngine(block)
+    }
+
+    private companion object {
+        const val METERS_PER_MILE = 1609.344
     }
 }

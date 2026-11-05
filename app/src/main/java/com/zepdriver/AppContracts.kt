@@ -180,6 +180,12 @@ interface TripLog {
 data class SimState(
     /** Simulated GPS is replacing the real one. */
     val enabled: Boolean = false,
+    /**
+     * The phone's GPS last put it more than [SimulatorController.AWAY_MILES]
+     * from Black Rock City. The simulator starts by itself there, and release
+     * builds allow it only there.
+     */
+    val awayFromPlaya: Boolean = false,
     val mode: SimMode = SimMode.MANUAL,
     /** Where MANUAL / AUTOPILOT drives start (the tour has its own start). */
     val start: SimStart = SimStart.OPEN_PLAYA,
@@ -204,15 +210,19 @@ data class SimState(
 )
 
 /**
- * Playa simulator for testing at home (debug builds only): replaces GPS with
+ * Playa simulator for trying the app away from the playa: replaces GPS with
  * a simulated car at Black Rock City, so warnings, navigation and the trip
  * log react as if driving on playa. Simulated positions are never sent over
- * the mesh. Always starts disabled; nothing is persisted.
+ * the mesh. It turns itself on when the phone's GPS is more than
+ * [AWAY_MILES] from the city. Release builds allow it only there and go back
+ * to GPS on the way in; debug builds allow it anywhere. Nothing is persisted.
  */
 interface SimulatorController {
-    /** False in release builds, where every call is ignored. */
-    val available: Boolean
+    /** Debug build: the simulator works anywhere, and the testing tools (screenshot scenes, the moving-lock override) are on. */
+    val debugBuild: Boolean
     val state: StateFlow<SimState>
+    /** The simulator can be used now (see [SimState.awayFromPlaya]); otherwise every call is ignored. */
+    val available: Boolean get() = debugBuild || state.value.awayFromPlaya
     fun setEnabled(enabled: Boolean)
     fun setMode(mode: SimMode)
     /** Moves the car to [start] and stops (MANUAL / AUTOPILOT). */
@@ -231,6 +241,11 @@ interface SimulatorController {
     fun setWarp(warp: Int)
     /** Moves the simulated car to [position], keeping its heading, and stops it. In TOUR mode this takes over (MANUAL). */
     fun teleport(position: LatLon)
+
+    companion object {
+        /** Farther than this from the Man, the phone isn't at Burning Man: the simulator takes over. */
+        const val AWAY_MILES = 50.0
+    }
 }
 
 data class VoiceState(

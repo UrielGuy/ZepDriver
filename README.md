@@ -66,14 +66,16 @@ to build only `:core`.
 
 ### Testing at home
 
-Debug builds (the APK CI publishes) have **Settings → Simulator**. It
-replaces GPS with a simulated car at Black Rock City: drive it with an
+**Settings → Simulator** replaces GPS with a simulated car at Black Rock City: drive it with an
 on-screen pad, run a guided tour that sets off each warning in turn, or let
 it follow the active route. Time can run faster (×2 to ×20) so you don't
 have to wait out real playa speed, and long-pressing the map moves the car
 there. Optional fake fleet cars show up in the fleet view. Simulated
 positions are never sent over the mesh, but they are recorded in the trip
-log. The simulator is always off when the app starts.
+log. The simulator is off when the app starts and turns itself on once the
+phone's GPS shows it more than 50 miles from Black Rock City. Play builds
+offer it only there and go back to GPS on the way in. Debug builds (the APK
+CI publishes) offer it anywhere.
 
 ## Data
 
