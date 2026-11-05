@@ -123,6 +123,11 @@ interface DriveController {
     /** Starts the foreground service (location permission must be granted). */
     fun start()
     fun stop()
+    /**
+     * Away from the playa the service stops when the app is left; true keeps
+     * it running (debug builds: the store video scenes record it in the background).
+     */
+    fun keepRunningInBackground(keep: Boolean)
     /** Plans and starts navigation through [stops] from the current position. */
     fun navigate(stops: List<Destination>)
     fun stopNavigation()

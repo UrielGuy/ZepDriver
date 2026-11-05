@@ -67,6 +67,8 @@ object ScreenshotScenes {
 
     private suspend fun run(scene: String, vm: MainViewModel) {
         vm.setScreenshotMode(true)
+        // The emulator's own GPS is far from the playa; the store videos record the app in the background.
+        AppGraph.drive.keepRunningInBackground(true)
         val bundle = vm.bundle.filterNotNull().first()
         val sim = vm.sim
         vm.updatePrefs(

@@ -362,7 +362,9 @@ they are Burning Man's confidential information:
   tested against the real data
 - MapLibre Native Android (offline GeoJSON layers, 3D extrusions)
 - In-memory search index; SQLite for the trip log
-- Foreground service for location, warnings, mesh and logging
+- Foreground service for location, warnings, mesh and logging; more than
+  50 miles from the Man it stops when the app goes to the background and
+  starts again when the app is opened
 - WorkManager for data updates
 - Meshtastic protobufs over BLE; `usb-serial-for-android` for flashing
 - Android TextToSpeech for voice

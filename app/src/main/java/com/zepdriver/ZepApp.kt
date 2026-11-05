@@ -63,11 +63,14 @@ class ZepApp : Application() {
         AppGraph.embargo = embargo
         AppGraph.trips = trips
         AppGraph.mesh = mesh
-        AppGraph.drive = DriveControllerImpl(this, engine)
+        val drive = DriveControllerImpl(this, engine)
+        AppGraph.drive = drive
         // Playa simulator: starts off, and turns itself on away from the playa.
         val sim = SimulatorControllerImpl(engine, mesh, debugBuild = BuildConfig.DEBUG)
         engine.realFixFilter = sim::onRealFix
         AppGraph.sim = sim
+        // Away from the playa, nothing runs in the background.
+        drive.stopInBackgroundAwayFromPlaya(sim.state, appScope)
         AppGraph.voice = VoiceControllerImpl(this, appScope)
 
         embargo.start()

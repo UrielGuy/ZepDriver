@@ -75,7 +75,10 @@ positions are never sent over the mesh, but they are recorded in the trip
 log. The simulator is off when the app starts and turns itself on once the
 phone's GPS shows it more than 50 miles from Black Rock City. Play builds
 offer it only there and go back to GPS on the way in. Debug builds (the APK
-CI publishes) offer it anywhere.
+CI publishes) offer it anywhere. That far out, ZepDriver also stops running
+in the background: the driving service stops when you leave the app (or when
+the car gets that far out with the app in the background, say on the drive
+home) and starts again when you open it.
 
 ## Data
 
